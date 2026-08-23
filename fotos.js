@@ -149,7 +149,7 @@
         $('deleteModal').hidden = true;
         await refresh();
     }
-    async function saveMarked() { const blob = await new Promise((resolve) => $('photoCanvas').toBlob(resolve, 'image/jpeg', JPEG_QUALITY)); await save({ placaVehiculo: getPlate(), blob, marked: true, createdAt: Date.now() }); $('photoEditor').hidden = true; await refresh(); }
+    async function saveMarked() { const blob = await new Promise((resolve) => $('photoCanvas').toBlob(resolve, 'image/jpeg', JPEG_QUALITY)); await save({ ...currentPhoto, blob, marked: true }); $('photoEditor').hidden = true; await refresh(); }
     function downloadAll() { recordsForPlate().then((records) => records.forEach((photo, index) => { const link = document.createElement('a'); link.href = URL.createObjectURL(photo.blob); link.download = `${getPlate()}_${String(index + 1).padStart(2, '0')}${photo.marked ? '_MARCADA' : ''}.jpg`; link.click(); setTimeout(() => URL.revokeObjectURL(link.href), 1000); })); }
 
     async function init() {
