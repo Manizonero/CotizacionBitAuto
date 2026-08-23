@@ -41,7 +41,8 @@
         <div class="cont_izq">
             <div class="desc">
                 <label for="descrip"></label>
-                <input type="text" id="descrip" name="descrip" placeholder="DESCRIPCION">
+                <input type="text" id="descrip" name="descrip" list="repuestosList" placeholder="DESCRIPCION" autocomplete="off">
+                <datalist id="repuestosList"></datalist>
             </div>
             <div class="cant">
                 <label for="cant"></label>
@@ -119,7 +120,7 @@
 
     <div class="final-action-row">
         <button id="newQuoteBtn" class="secondary-button">Nueva cotización</button>
-        <a id="photosLink" class="secondary-button" href="fotos.html">Abrir fotos</a>
+        <a id="photosLink" class="secondary-button" href="fotos.html">Fotos</a>
     </div>
 
     <div id="userModal" class="user-modal" role="dialog" aria-modal="true" aria-labelledby="user-title" hidden>
@@ -181,6 +182,17 @@
                 </div>
                 <button type="submit" class="secondary-button user-submit">Crear cotización</button>
             </form>
+        </div>
+    </div>
+
+    <div id="newQuoteWarningModal" class="user-modal" role="dialog" aria-modal="true" aria-labelledby="new-quote-warning-title" hidden>
+        <div class="user-modal-content new-quote-warning-content">
+            <h2 id="new-quote-warning-title">¿YA DESCARGÓ LAS FOTOS?</h2>
+            <p>Al crear una nueva cotización se eliminarán los datos y las fotos de la placa actual.</p>
+            <div class="new-quote-warning-actions">
+                <button id="cancelNewQuoteBtn" class="secondary-button" type="button">Cancelar</button>
+                <button id="confirmNewQuoteBtn" class="secondary-button warning-button" type="button">Sí, continuar</button>
+            </div>
         </div>
     </div>
 

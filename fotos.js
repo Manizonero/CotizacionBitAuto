@@ -120,16 +120,6 @@
     async function saveMarked() { const blob = await new Promise((resolve) => $('photoCanvas').toBlob(resolve, 'image/jpeg', JPEG_QUALITY)); await save({ placaVehiculo: getPlate(), blob, marked: true, createdAt: Date.now() }); $('photoEditor').hidden = true; await refresh(); }
     function downloadAll() { recordsForPlate().then((records) => records.forEach((photo, index) => { const link = document.createElement('a'); link.href = URL.createObjectURL(photo.blob); link.download = `${getPlate()}_${String(index + 1).padStart(2, '0')}${photo.marked ? '_MARCADA' : ''}.jpg`; link.click(); setTimeout(() => URL.revokeObjectURL(link.href), 1000); })); }
 
-    function setupEditorVoice() {
-        const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        const button = $('editorMicBtn');
-        if (!Recognition) { button.disabled = true; $('editorVoiceStatus').textContent = 'Microfono no disponible en este navegador.'; return; }
-        const recognition = new Recognition(); recognition.lang = 'es-ES'; recognition.continuous = false; recognition.interimResults = false;
-        recognition.onresult = (event) => applyEditorCommand(event.results[0][0].transcript);
-        recognition.onerror = () => { button.classList.remove('listening'); $('editorVoiceStatus').textContent = 'No se pudo usar el microfono.'; };
-        recognition.onend = () => button.classList.remove('listening');
-        button.addEventListener('click', () => { try { recognition.start(); button.classList.add('listening'); $('editorVoiceStatus').textContent = 'Escuchando comando...'; } catch (error) { /* ya activo */ } });
-    }
     function applyEditorCommand(value) {
         const text = value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
         $('editorCommandInput').value = value;
@@ -145,7 +135,7 @@
         $('plateLabel').textContent = getPlate() ? `PLACA: ${getPlate()}` : 'Sin placa seleccionada';
         try { await openDatabase(); await refresh(); } catch (error) { setStatus('IndexedDB no esta disponible en este navegador.'); return; }
         $('photoInput').addEventListener('change', (event) => processFiles(event, false)); $('detailPhotoInput').addEventListener('change', (event) => processFiles(event, true)); $('downloadPhotosBtn').addEventListener('click', downloadAll); $('cancelDeleteBtn').addEventListener('click', () => { photoPendingDelete = null; $('deleteModal').hidden = true; }); $('confirmDeleteBtn').addEventListener('click', confirmDeletePhoto); $('cancelEditBtn').addEventListener('click', () => { $('photoEditor').hidden = true; }); $('clearDrawingBtn').addEventListener('click', clearDrawing); $('saveMarkedBtn').addEventListener('click', saveMarked);
-        const canvas = $('photoCanvas'); canvas.addEventListener('pointerdown', startDraw); canvas.addEventListener('pointermove', continueDraw); canvas.addEventListener('pointerup', finishDraw); canvas.addEventListener('pointercancel', finishDraw); const context = canvas.getContext('2d'); context.strokeStyle = '#ef2222'; context.lineWidth = annotationStrokeWidth(); context.lineCap = 'round'; $('applyEditorCommandBtn').addEventListener('click', () => applyEditorCommand($('editorCommandInput').value)); $('editorCommandInput').addEventListener('keydown', (event) => { if (event.key === 'Enter') applyEditorCommand(event.target.value); }); setupEditorVoice();
+        const canvas = $('photoCanvas'); canvas.addEventListener('pointerdown', startDraw); canvas.addEventListener('pointermove', continueDraw); canvas.addEventListener('pointerup', finishDraw); canvas.addEventListener('pointercancel', finishDraw); const context = canvas.getContext('2d'); context.strokeStyle = '#ef2222'; context.lineWidth = annotationStrokeWidth(); context.lineCap = 'round'; $('editorCommandInput').addEventListener('keydown', (event) => { if (event.key === 'Enter') applyEditorCommand(event.target.value); });
     }
     window.descargarFotosMasivas = downloadAll;
     document.addEventListener('DOMContentLoaded', init);

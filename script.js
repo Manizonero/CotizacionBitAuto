@@ -2,6 +2,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const addItemButton = document.getElementById('addItemBtn');
     const itemsTableBody = document.querySelector('#itemsTable tbody');
+    const repuestosList = document.getElementById('repuestosList');
 
     const descripInput = document.getElementById('descrip');
     const cantInput = document.getElementById('cant');
@@ -29,6 +30,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const quoteSummary = document.getElementById('quoteSummary');
     const newQuoteBtn = document.getElementById('newQuoteBtn');
     const photosLink = document.getElementById('photosLink');
+    const newQuoteWarningModal = document.getElementById('newQuoteWarningModal');
+    const cancelNewQuoteBtn = document.getElementById('cancelNewQuoteBtn');
+    const confirmNewQuoteBtn = document.getElementById('confirmNewQuoteBtn');
 
     const STORAGE_KEY = 'coticarQuoteState';
 
@@ -119,6 +123,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Función para renderizar la tabla desde el array quoteItems
     const renderTable = () => {
         itemsTableBody.innerHTML = '';
+        updatePartSuggestions(descripInput.value);
 
         quoteItems.forEach((item, index) => {
             const newRow = itemsTableBody.insertRow();
@@ -175,6 +180,19 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         saveState();
+    };
+
+    const updatePartSuggestions = (filter = '') => {
+        if (!repuestosList) return;
+        const query = filter.trim().toLowerCase();
+        const descriptions = [...new Set(quoteItems.map((item) => item.descrip).filter(Boolean))]
+            .filter((description) => description.toLowerCase().includes(query));
+        repuestosList.innerHTML = '';
+        descriptions.forEach((description) => {
+            const option = document.createElement('option');
+            option.value = description;
+            repuestosList.appendChild(option);
+        });
     };
 
     const loadState = () => {
@@ -259,6 +277,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    descripInput.addEventListener('input', () => updatePartSuggestions(descripInput.value));
+
     userForm.addEventListener('submit', (event) => {
         event.preventDefault();
         if (!userForm.reportValidity()) return;
@@ -297,7 +317,37 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const handleNewQuote = () => {
-        if (!confirm('¿Deseas iniciar una nueva cotización y borrar los datos actuales?')) return;
+        newQuoteWarningModal.hidden = false;
+    };
+
+    const deletePhotosForPlate = (plate) => new Promise((resolve, reject) => {
+        if (!plate || !window.indexedDB) { resolve(); return; }
+        const request = indexedDB.open('TallerDB', 1);
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => {
+            const database = request.result;
+            if (!database.objectStoreNames.contains('inspecciones')) { resolve(); return; }
+            const transaction = database.transaction('inspecciones', 'readwrite');
+            const index = transaction.objectStore('inspecciones').index('placaVehiculo');
+            index.openCursor(plate).onsuccess = (event) => {
+                const cursor = event.target.result;
+                if (cursor) { cursor.delete(); cursor.continue(); }
+            };
+            transaction.oncomplete = () => { database.close(); resolve(); };
+            transaction.onerror = () => { database.close(); reject(transaction.error); };
+        };
+    });
+
+    const confirmNewQuote = async () => {
+        const currentPlate = placaInput.value.trim().toUpperCase();
+        try {
+            await deletePhotosForPlate(currentPlate);
+        } catch (error) {
+            newQuoteWarningModal.hidden = true;
+            alert('No se pudieron eliminar las fotos de la placa actual.');
+            return;
+        }
+        newQuoteWarningModal.hidden = true;
         quoteItems = [];
         resetFormFields();
         clearState();
@@ -306,6 +356,9 @@ document.addEventListener('DOMContentLoaded', () => {
         toggleFields();
         openQuoteModal();
     };
+
+    cancelNewQuoteBtn.addEventListener('click', () => { newQuoteWarningModal.hidden = true; });
+    confirmNewQuoteBtn.addEventListener('click', confirmNewQuote);
 
     // Lógica para habilitar/deshabilitar campos (Marca, Cilindraje, VIN)
     // Deshabilitar los campos por defecto al cargar la página
