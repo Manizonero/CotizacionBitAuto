@@ -543,6 +543,10 @@ label {
     opacity: 0.95;
 }
 
+.photos-link {
+    text-decoration: none;
+}
+
 /* Título de la lista de ítems */
 .lista-titulo {
     width: 90%;

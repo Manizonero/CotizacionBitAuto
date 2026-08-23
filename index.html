@@ -120,7 +120,7 @@
 
     <div class="final-action-row">
         <button id="newQuoteBtn" class="secondary-button">Nueva cotización</button>
-        <a id="photosLink" class="secondary-button" href="fotos.html">Fotos</a>
+        <a id="photosLink" class="secondary-button photos-link" href="fotos.html">Fotos</a>
     </div>
 
     <div id="userModal" class="user-modal" role="dialog" aria-modal="true" aria-labelledby="user-title" hidden>
@@ -192,6 +192,17 @@
             <div class="new-quote-warning-actions">
                 <button id="cancelNewQuoteBtn" class="secondary-button" type="button">Cancelar</button>
                 <button id="confirmNewQuoteBtn" class="secondary-button warning-button" type="button">Sí, continuar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="deleteItemModal" class="user-modal" role="dialog" aria-modal="true" aria-labelledby="delete-item-title" hidden>
+        <div class="user-modal-content delete-item-modal-content">
+            <h2 id="delete-item-title">ELIMINAR REPUESTO</h2>
+            <p>¿Deseas eliminar este repuesto de la lista?</p>
+            <div class="new-quote-warning-actions">
+                <button id="cancelDeleteItemBtn" class="secondary-button" type="button">Cancelar</button>
+                <button id="confirmDeleteItemBtn" class="secondary-button warning-button" type="button">Eliminar</button>
             </div>
         </div>
     </div>

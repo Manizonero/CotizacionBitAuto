@@ -33,12 +33,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const newQuoteWarningModal = document.getElementById('newQuoteWarningModal');
     const cancelNewQuoteBtn = document.getElementById('cancelNewQuoteBtn');
     const confirmNewQuoteBtn = document.getElementById('confirmNewQuoteBtn');
+    const deleteItemModal = document.getElementById('deleteItemModal');
+    const cancelDeleteItemBtn = document.getElementById('cancelDeleteItemBtn');
+    const confirmDeleteItemBtn = document.getElementById('confirmDeleteItemBtn');
 
     const STORAGE_KEY = 'coticarQuoteState';
 
     // Array para almacenar los ítems de la cotización
     let quoteItems = [];
     let isLoading = false;
+    let itemPendingDelete = null;
 
     const saveState = () => {
         if (isLoading) return;
@@ -173,8 +177,8 @@ document.addEventListener('DOMContentLoaded', () => {
             deleteButton.classList.add('delete-btn');
             deleteButton.title = 'Eliminar ítem';
             deleteButton.addEventListener('click', () => {
-                quoteItems.splice(index, 1);
-                renderTable(); 
+                itemPendingDelete = index;
+                deleteItemModal.hidden = false;
             });
             actionsCell.appendChild(deleteButton);
         });
@@ -359,6 +363,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     cancelNewQuoteBtn.addEventListener('click', () => { newQuoteWarningModal.hidden = true; });
     confirmNewQuoteBtn.addEventListener('click', confirmNewQuote);
+    cancelDeleteItemBtn.addEventListener('click', () => { itemPendingDelete = null; deleteItemModal.hidden = true; });
+    confirmDeleteItemBtn.addEventListener('click', () => {
+        if (itemPendingDelete === null) return;
+        quoteItems.splice(itemPendingDelete, 1);
+        itemPendingDelete = null;
+        deleteItemModal.hidden = true;
+        renderTable();
+    });
 
     // Lógica para habilitar/deshabilitar campos (Marca, Cilindraje, VIN)
     // Deshabilitar los campos por defecto al cargar la página
