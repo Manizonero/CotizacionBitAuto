@@ -19,6 +19,7 @@
     let moveOffset;
     let annotationMode = 'auto';
     let photoPendingDelete;
+    const annotationStrokeWidth = () => Math.max(10, Math.min(24, Math.max($('photoCanvas').width, $('photoCanvas').height) / 160));
 
     function getPlate() {
         if (params.get('placa')) return params.get('placa').trim().toUpperCase();
@@ -40,9 +41,6 @@
     function recordsForPlate() {
         return new Promise((resolve, reject) => { const request = store('readonly').index('placaVehiculo').getAll(getPlate()); request.onsuccess = () => resolve(request.result.filter((record) => record.blob?.size).sort((a, b) => a.createdAt - b.createdAt)); request.onerror = () => reject(request.error); });
     }
-    function voiceRecordsForPlate() {
-        return new Promise((resolve, reject) => { const request = store('readonly').index('placaVehiculo').getAll(getPlate()); request.onsuccess = () => resolve(request.result.filter((record) => record.tipo === 'repuesto-voz').sort((a, b) => a.createdAt - b.createdAt)); request.onerror = () => reject(request.error); });
-    }
     function compress(file) {
         return new Promise((resolve, reject) => {
             const image = new Image();
@@ -60,9 +58,6 @@
     async function refresh() {
         photos = getPlate() ? await recordsForPlate() : [];
         render();
-        const parts = getPlate() ? await voiceRecordsForPlate() : [];
-        $('partsList').innerHTML = '';
-        parts.forEach((part) => { const item = document.createElement('li'); item.textContent = part.textoVoz; $('partsList').appendChild(item); });
         setStatus(getPlate() ? `${photos.length} fotos guardadas localmente para ${getPlate()}.` : 'Vuelve a la cotizacion y registra una placa.');
     }
     async function processFiles(event, openDetail) {
@@ -74,11 +69,11 @@
     function drawAnnotations() {
         const context = $('photoCanvas').getContext('2d');
         annotations.forEach((annotation) => {
-            context.save(); context.strokeStyle = '#ef2222'; context.lineWidth = 7; context.lineCap = 'round'; context.beginPath();
+            context.save(); context.strokeStyle = '#ef2222'; context.lineWidth = annotationStrokeWidth(); context.lineCap = 'round'; context.beginPath();
             if (annotation.type === 'circle') context.arc(annotation.cx, annotation.cy, annotation.radius, 0, Math.PI * 2);
             else if (annotation.type === 'arrow') { context.moveTo(annotation.x1, annotation.y1); context.lineTo(annotation.x2, annotation.y2); const angle = Math.atan2(annotation.y2 - annotation.y1, annotation.x2 - annotation.x1); const size = 28; context.moveTo(annotation.x2, annotation.y2); context.lineTo(annotation.x2 - size * Math.cos(angle - Math.PI / 6), annotation.y2 - size * Math.sin(angle - Math.PI / 6)); context.moveTo(annotation.x2, annotation.y2); context.lineTo(annotation.x2 - size * Math.cos(angle + Math.PI / 6), annotation.y2 - size * Math.sin(angle + Math.PI / 6)); }
             context.stroke(); context.restore();
-            if (annotation.type === 'text') { context.save(); const padding = 12; const fontSize = Math.max(20, Math.min(34, $('photoCanvas').width / 28)); context.font = `700 ${fontSize}px Oxanium, sans-serif`; const textWidth = context.measureText(annotation.text).width; const x = $('photoCanvas').width - textWidth - padding * 2; const y = $('photoCanvas').height - fontSize - padding * 2; context.fillStyle = '#fff'; context.fillRect(Math.max(0, x), Math.max(0, y), textWidth + padding * 2, fontSize + padding * 2); context.fillStyle = '#111827'; context.textBaseline = 'top'; context.fillText(annotation.text, Math.max(padding, x + padding), Math.max(padding, y + padding)); context.restore(); }
+            if (annotation.type === 'text') { context.save(); const padding = 18; const fontSize = Math.max(32, Math.min(64, Math.max($('photoCanvas').width, $('photoCanvas').height) / 20)); context.font = `700 ${fontSize}px Oxanium, sans-serif`; const textWidth = context.measureText(annotation.text).width; const x = $('photoCanvas').width - textWidth - padding * 2; const y = $('photoCanvas').height - fontSize - padding * 2; context.fillStyle = '#fff'; context.fillRect(Math.max(0, x), Math.max(0, y), Math.min(textWidth + padding * 2, $('photoCanvas').width), fontSize + padding * 2); context.fillStyle = '#111827'; context.textBaseline = 'top'; context.fillText(annotation.text, Math.max(padding, x + padding), Math.max(padding, y + padding)); context.restore(); }
         });
     }
     function annotationAt(point) {
@@ -93,9 +88,10 @@
     function distance(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
     function recognizeGesture(path) {
         if (path.length < 8) return;
-        const first = path[0]; const last = path[path.length - 1]; const pathLength = path.slice(1).reduce((total, point, index) => total + distance(path[index], point), 0); const xs = path.map((point) => point.x); const ys = path.map((point) => point.y); const width = Math.max(...xs) - Math.min(...xs); const height = Math.max(...ys) - Math.min(...ys);
-        const closed = distance(first, last) < Math.max(width, height) * 0.28 && width > 20 && height > 20 && pathLength > 100;
-        const linear = pathLength > 100 && distance(first, last) > Math.max(width, height) * 0.65;
+        const first = path[0]; const last = path[path.length - 1]; const pathLength = path.slice(1).reduce((total, point, index) => total + distance(path[index], point), 0); const xs = path.map((point) => point.x); const ys = path.map((point) => point.y); const width = Math.max(...xs) - Math.min(...xs); const height = Math.max(...ys) - Math.min(...ys); const size = Math.max(width, height); const endDistance = distance(first, last);
+        const closed = endDistance < size * 0.42 && width > 28 && height > 28 && pathLength > size * 1.3;
+        const straightness = pathLength ? endDistance / pathLength : 0;
+        const linear = size > 35 && pathLength > size * 1.05 && straightness > 0.55;
         if (annotationMode === 'circle' || (annotationMode === 'auto' && closed)) {
             annotations.push({ type: 'circle', cx: (Math.min(...xs) + Math.max(...xs)) / 2, cy: (Math.min(...ys) + Math.max(...ys)) / 2, radius: Math.min(width, height) / 2 }); annotationMode = 'auto'; redraw(); return;
         }
@@ -145,20 +141,11 @@
         else $('editorVoiceStatus').textContent = 'Escribe un texto para agregarlo a la foto.';
     }
 
-    function setupVoice() {
-        const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if (!Recognition) { $('voiceBtn').disabled = true; $('voiceStatus').textContent = 'Dictado no disponible en este navegador.'; return; }
-        const recognition = new Recognition(); recognition.lang = 'es-ES'; recognition.continuous = true; recognition.interimResults = true; let listening = false;
-        recognition.onresult = (event) => { let text = ''; for (let index = event.resultIndex; index < event.results.length; index += 1) text += event.results[index][0].transcript; $('voiceTranscript').textContent = text; if (event.results[event.results.length - 1].isFinal) { const match = text.match(/escribe\s+(.+)/i); if (match) { save({ placaVehiculo: getPlate(), tipo: 'repuesto-voz', textoVoz: match[1].trim(), createdAt: Date.now() }); const item = document.createElement('li'); item.textContent = match[1].trim(); $('partsList').appendChild(item); } } };
-        recognition.onend = () => { if (listening) try { recognition.start(); } catch (error) { /* ya iniciado */ } };
-        recognition.onerror = (event) => { if (event.error === 'not-allowed') { listening = false; $('voiceStatus').textContent = 'Permiso de microfono denegado.'; } };
-        $('voiceBtn').addEventListener('click', () => { listening = !listening; if (listening) { recognition.start(); $('voiceBtn').classList.add('listening'); $('voiceStatus').textContent = 'Escuchando...'; } else { recognition.stop(); $('voiceBtn').classList.remove('listening'); $('voiceStatus').textContent = 'Dictado detenido.'; } });
-    }
     async function init() {
         $('plateLabel').textContent = getPlate() ? `PLACA: ${getPlate()}` : 'Sin placa seleccionada';
         try { await openDatabase(); await refresh(); } catch (error) { setStatus('IndexedDB no esta disponible en este navegador.'); return; }
         $('photoInput').addEventListener('change', (event) => processFiles(event, false)); $('detailPhotoInput').addEventListener('change', (event) => processFiles(event, true)); $('downloadPhotosBtn').addEventListener('click', downloadAll); $('cancelDeleteBtn').addEventListener('click', () => { photoPendingDelete = null; $('deleteModal').hidden = true; }); $('confirmDeleteBtn').addEventListener('click', confirmDeletePhoto); $('cancelEditBtn').addEventListener('click', () => { $('photoEditor').hidden = true; }); $('clearDrawingBtn').addEventListener('click', clearDrawing); $('saveMarkedBtn').addEventListener('click', saveMarked);
-        const canvas = $('photoCanvas'); canvas.addEventListener('pointerdown', startDraw); canvas.addEventListener('pointermove', continueDraw); canvas.addEventListener('pointerup', finishDraw); canvas.addEventListener('pointercancel', finishDraw); const context = canvas.getContext('2d'); context.strokeStyle = '#ef2222'; context.lineWidth = 7; context.lineCap = 'round'; $('applyEditorCommandBtn').addEventListener('click', () => applyEditorCommand($('editorCommandInput').value)); $('editorCommandInput').addEventListener('keydown', (event) => { if (event.key === 'Enter') applyEditorCommand(event.target.value); }); setupVoice(); setupEditorVoice();
+        const canvas = $('photoCanvas'); canvas.addEventListener('pointerdown', startDraw); canvas.addEventListener('pointermove', continueDraw); canvas.addEventListener('pointerup', finishDraw); canvas.addEventListener('pointercancel', finishDraw); const context = canvas.getContext('2d'); context.strokeStyle = '#ef2222'; context.lineWidth = annotationStrokeWidth(); context.lineCap = 'round'; $('applyEditorCommandBtn').addEventListener('click', () => applyEditorCommand($('editorCommandInput').value)); $('editorCommandInput').addEventListener('keydown', (event) => { if (event.key === 'Enter') applyEditorCommand(event.target.value); }); setupEditorVoice();
     }
     window.descargarFotosMasivas = downloadAll;
     document.addEventListener('DOMContentLoaded', init);

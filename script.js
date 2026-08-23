@@ -235,6 +235,24 @@ document.addEventListener('DOMContentLoaded', () => {
         empresaInput
     ];
 
+    const uppercaseFields = [placaInput, marcaInput, lineaInput, colorInput, tipoClienteInput];
+    const normalizeUppercaseFields = () => {
+        uppercaseFields.forEach((field) => {
+            if (field) field.value = field.value.toUpperCase();
+        });
+    };
+
+    uppercaseFields.forEach((field) => {
+        if (field) {
+            field.addEventListener('input', () => {
+                const cursorPosition = field.selectionStart;
+                field.value = field.value.toUpperCase();
+                field.setSelectionRange(cursorPosition, cursorPosition);
+                saveState();
+            });
+        }
+    });
+
     watchedFields.forEach((field) => {
         if (field) {
             field.addEventListener('input', saveState);
@@ -315,6 +333,7 @@ document.addEventListener('DOMContentLoaded', () => {
     marcaInput.addEventListener('input', toggleFields);
 
     loadState();
+    normalizeUppercaseFields();
     
     // Verificar estado de marca después de cargar datos guardados
     toggleFields();

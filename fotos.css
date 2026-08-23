@@ -4,6 +4,7 @@ body { margin: 0; min-height: 100vh; color: #17233f; background: #eef3fb; font-f
 .photos-app { width: min(1120px, 94%); margin: 0 auto; padding: 28px 0 48px; }
 .photos-header { display: flex; align-items: flex-start; gap: 22px; margin-bottom: 24px; }
 .back-link { color: #315ddc; font-weight: 700; text-decoration: none; padding-top: 7px; }
+.data-link { display: inline-block; margin-top: 4px; }
 .eyebrow { margin: 0 0 5px; color: #315ddc; font-size: 11px; font-weight: 700; letter-spacing: 1px; }
 h1, h2, p { margin-top: 0; } h1 { margin-bottom: 4px; font-size: clamp(1.7rem, 5vw, 2.5rem); } h2 { margin-bottom: 4px; font-size: 1.2rem; }
 .plate-label, #photoStatus, #voiceStatus { margin-bottom: 0; color: #60708d; font-size: .9rem; }
