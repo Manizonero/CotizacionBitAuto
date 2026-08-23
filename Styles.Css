@@ -543,11 +543,9 @@ label {
     opacity: 0.95;
 }
 
-.photos-link {
-    text-decoration: none;
-    border: 2px solid #4b859c;
-    background-color: #ffffff;
-}
+.nav-button { display: inline-block; padding: 12px 22px; border: 2px solid #4b859c; border-radius: 16px; color: #24314c; background-color: #ffffff; font: 600 16px "Oxanium", sans-serif; line-height: normal; text-decoration: none; }
+.nav-button:hover { transform: translateY(-1px); opacity: 0.95; background-color: #f1f8fb; }
+.photos-link { text-decoration: none; }
 
 /* Título de la lista de ítems */
 .lista-titulo {

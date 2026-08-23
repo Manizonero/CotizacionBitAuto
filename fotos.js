@@ -35,8 +35,8 @@
         const menu = $('editorPartsMenu');
         if (!menu) return;
         const query = filter.trim().toLowerCase();
-        menu.innerHTML = '';
-        savedPartDescriptions().filter((description) => description.toLowerCase().includes(query)).forEach((description) => {
+        const descriptions = savedPartDescriptions(); menu.innerHTML = '';
+        descriptions.filter((description) => !query || description.toLowerCase().includes(query)).forEach((description) => {
             const option = document.createElement('button');
             option.type = 'button';
             option.className = 'editor-part-option';
@@ -46,7 +46,15 @@
             option.addEventListener('click', () => addTextAnnotation(description));
             menu.appendChild(option);
         });
-        menu.hidden = !menu.children.length;
+        if (menu.children.length) menu.hidden = false;
+        else if (!descriptions.length) menu.hidden = true;
+        const commandInput = $('editorCommandInput'); const partsMenu = $('editorPartsMenu'); const showPartsMenu = () => { updateEditorPartSuggestions(commandInput.value); partsMenu.hidden = false; }; commandInput.addEventListener('focus', showPartsMenu); commandInput.addEventListener('click', showPartsMenu); commandInput.addEventListener('pointerdown', showPartsMenu); commandInput.addEventListener('touchstart', showPartsMenu, { passive: true }); commandInput.addEventListener('input', (event) => { updateEditorPartSuggestions(event.target.value); partsMenu.hidden = false; });
+    }
+    function openEditorPartsMenu() {
+        const menu = $('editorPartsMenu');
+        if (!menu) return;
+        updateEditorPartSuggestions($('editorCommandInput').value);
+        if (menu.children.length) menu.hidden = false;
     }
     function addTextAnnotation(value) {
         if (!value.trim()) return;
@@ -166,7 +174,7 @@
         $('plateLabel').textContent = getPlate() ? `PLACA: ${getPlate()}` : 'Sin placa seleccionada';
         try { await openDatabase(); await refresh(); } catch (error) { setStatus('IndexedDB no esta disponible en este navegador.'); return; }
         $('photoInput').addEventListener('change', (event) => processFiles(event, false)); $('detailPhotoInput').addEventListener('change', (event) => processFiles(event, true)); $('downloadPhotosBtn').addEventListener('click', downloadAll); $('cancelDeleteBtn').addEventListener('click', () => { photoPendingDelete = null; $('deleteModal').hidden = true; }); $('confirmDeleteBtn').addEventListener('click', confirmDeletePhoto); $('cancelEditBtn').addEventListener('click', () => { $('photoEditor').hidden = true; }); $('clearDrawingBtn').addEventListener('click', clearDrawing); $('saveMarkedBtn').addEventListener('click', saveMarked);
-        const commandInput = $('editorCommandInput'); const partsMenu = $('editorPartsMenu'); commandInput.addEventListener('focus', () => updateEditorPartSuggestions(commandInput.value)); commandInput.addEventListener('pointerdown', () => updateEditorPartSuggestions(commandInput.value)); commandInput.addEventListener('input', (event) => { if (!partsMenu.hidden) updateEditorPartSuggestions(event.target.value); }); const canvas = $('photoCanvas'); canvas.addEventListener('pointerdown', startDraw); canvas.addEventListener('pointermove', continueDraw); canvas.addEventListener('pointerup', finishDraw); canvas.addEventListener('pointercancel', finishDraw); const context = canvas.getContext('2d'); context.strokeStyle = '#ef2222'; context.lineWidth = annotationStrokeWidth(); context.lineCap = 'round'; commandInput.addEventListener('keydown', (event) => { if (event.key === 'Enter') applyEditorCommand(event.target.value); });
+        const commandInput = $('editorCommandInput'); const partsMenu = $('editorPartsMenu'); commandInput.addEventListener('focus', openEditorPartsMenu); commandInput.addEventListener('click', openEditorPartsMenu); commandInput.addEventListener('pointerdown', openEditorPartsMenu); commandInput.addEventListener('input', (event) => { updateEditorPartSuggestions(event.target.value); if (partsMenu.children.length) partsMenu.hidden = false; }); const canvas = $('photoCanvas'); canvas.addEventListener('pointerdown', startDraw); canvas.addEventListener('pointermove', continueDraw); canvas.addEventListener('pointerup', finishDraw); canvas.addEventListener('pointercancel', finishDraw); const context = canvas.getContext('2d'); context.strokeStyle = '#ef2222'; context.lineWidth = annotationStrokeWidth(); context.lineCap = 'round'; commandInput.addEventListener('keydown', (event) => { if (event.key === 'Enter') applyEditorCommand(event.target.value); });
     }
     window.descargarFotosMasivas = downloadAll;
     document.addEventListener('DOMContentLoaded', init);
