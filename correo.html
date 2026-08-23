@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enviar cotizacion</title>
+    <link rel="stylesheet" href="correo.css">
+</head>
+<body>
+    <main class="mail-app">
+        <header class="mail-header">
+            <a href="index.html" class="back-link">Datos</a>
+            <div><p class="eyebrow">BITAUTO / COTIZACION</p><h1>Preparar correo</h1><p id="mailVehicleLabel" class="muted"></p></div>
+        </header>
+        <section class="mail-panel">
+            <div class="panel-title"><div><p class="eyebrow">DESTINATARIOS</p><h2>Correos predeterminados</h2><p id="selectedRecipients" class="muted">Ningun correo seleccionado</p></div><button id="openRecipientsBtn" class="button primary" type="button">Seleccionar</button></div>
+        </section>
+        <section class="mail-panel">
+            <label class="field-label" for="greetingInput">SALUDO</label>
+            <input id="greetingInput" class="wide-input" type="text" placeholder="Cordial saludo,"><label class="field-label" for="subjectInput">ASUNTO</label>
+            <input id="subjectInput" class="wide-input" type="text">
+        </section>
+        <section class="mail-panel preview-panel">
+            <div class="panel-title"><div><p class="eyebrow">VISTA PREVIA</p><h2>Cuerpo del correo</h2></div></div>
+            <div id="mailPreviewGreeting" class="mail-preview-greeting"></div>
+            <div class="mail-preview-section-title">Datos del vehiculo</div>
+            <div id="mailVehicleTableWrap" class="mail-table-wrap"></div>
+            <div class="mail-preview-section-title">Repuestos solicitados</div>
+            <div class="mail-table-wrap"><table class="mail-items-table"><thead><tr><th>No.</th><th>Descripcion</th><th>Cantidad</th><th>Estado</th><th>Pint.</th><th>Dato</th></tr></thead><tbody id="mailItemsTableBody"></tbody></table></div>
+            <div class="mail-actions"><button id="copyBodyBtn" class="button secondary" type="button">Copiar cuerpo</button><button id="openGmailBtn" class="button primary" type="button">Abrir en Gmail</button></div>
+            <p id="mailStatus" class="status" aria-live="polite"></p>
+        </section>
+    </main>
+    <div id="recipientsModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="recipients-title" hidden>
+        <section class="recipients-modal">
+            <div class="modal-heading"><div><p class="eyebrow">DESTINATARIOS</p><h2 id="recipients-title">Selecciona los correos</h2></div><button id="closeRecipientsBtn" class="close-button" type="button" aria-label="Cerrar">&#10005;</button></div>
+            <div id="contactsList" class="contacts-list"></div>
+            <button id="addContactBtn" class="add-contact-button" type="button" title="Agregar destinatario" aria-label="Agregar destinatario">+</button>
+            <form id="contactForm" class="contact-form" hidden>
+                <input id="contactName" type="text" placeholder="Nombre del correo" required>
+                <input id="contactEmail" type="email" placeholder="correo@ejemplo.com" required>
+                <div class="form-actions"><button id="cancelContactBtn" type="button" class="button secondary">Cancelar</button><button type="submit" class="button primary">Guardar</button></div>
+            </form>
+            <p id="contactStatus" class="status" aria-live="polite"></p>
+            <button id="saveRecipientsBtn" class="button primary modal-save-button" type="button">Usar seleccionados</button>
+        </section>
+    </div>
+    <script src="correo.js"></script>
+</body>
+</html>

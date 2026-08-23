@@ -37,6 +37,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const deleteItemModal = document.getElementById('deleteItemModal');
     const cancelDeleteItemBtn = document.getElementById('cancelDeleteItemBtn');
     const confirmDeleteItemBtn = document.getElementById('confirmDeleteItemBtn');
+    const finalizeQuoteBtn = document.getElementById('finalizeQuoteBtn');
+    const finalizeModal = document.getElementById('finalizeModal');
+    const finalizeMessage = document.getElementById('finalizeMessage');
+    const cancelFinalizeBtn = document.getElementById('cancelFinalizeBtn');
+    const downloadBeforeFinalizeBtn = document.getElementById('downloadBeforeFinalizeBtn');
+    const continueFinalizeBtn = document.getElementById('continueFinalizeBtn');
 
     const STORAGE_KEY = 'coticarQuoteState';
 
@@ -48,6 +54,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const saveState = () => {
         if (isLoading) return;
         
+        const currentState = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
         const state = {
             fields: {
                 fecha: fechaInput.value.trim(),
@@ -61,7 +68,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 vin: vinInput.value.trim(),
                 nombreCompleto: nombreCompletoInput.value.trim()
             },
-            quoteItems
+            quoteItems,
+            photosDownloadedFor: currentState.photosDownloadedFor === placaInput.value.trim().toUpperCase()
+                ? currentState.photosDownloadedFor
+                : ''
         };
         localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
         if (photosLink) photosLink.href = `fotos.html?placa=${encodeURIComponent(placaInput.value.trim().toUpperCase())}`;
@@ -69,6 +79,46 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const clearState = () => {
         localStorage.removeItem(STORAGE_KEY);
+    };
+
+    const countPhotosForPlate = (plate) => new Promise((resolve, reject) => {
+        if (!plate || !window.indexedDB) { resolve(0); return; }
+        const request = indexedDB.open('TallerDB', 1);
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => {
+            const database = request.result;
+            if (!database.objectStoreNames.contains('inspecciones')) { database.close(); resolve(0); return; }
+            const readRequest = database.transaction('inspecciones', 'readonly').objectStore('inspecciones').index('placaVehiculo').getAll(plate);
+            readRequest.onsuccess = () => { database.close(); resolve(readRequest.result.filter((record) => record.blob?.size).length); };
+            readRequest.onerror = () => { database.close(); reject(readRequest.error); };
+        };
+    });
+
+    const openFinalizeModal = async () => {
+        const plate = placaInput.value.trim().toUpperCase();
+        finalizeModal.hidden = false;
+        downloadBeforeFinalizeBtn.hidden = true;
+        continueFinalizeBtn.hidden = true;
+        if (!quoteItems.length) {
+            finalizeMessage.textContent = 'Agrega al menos un repuesto antes de finalizar la cotizacion.';
+            return;
+        }
+        let photoCount = 0;
+        try { photoCount = await countPhotosForPlate(plate); } catch (error) { photoCount = 0; }
+        if (!photoCount) {
+            finalizeMessage.textContent = 'Debes registrar las fotos de esta cotizacion antes de continuar.';
+            downloadBeforeFinalizeBtn.textContent = 'Ir a tomar fotos';
+            downloadBeforeFinalizeBtn.hidden = false;
+            return;
+        }
+        if (localStorage.getItem(STORAGE_KEY) && JSON.parse(localStorage.getItem(STORAGE_KEY)).photosDownloadedFor !== plate) {
+            finalizeMessage.textContent = 'Debes descargar todo el registro fotografico antes de finalizar.';
+            downloadBeforeFinalizeBtn.textContent = 'Ir a descargar fotos';
+            downloadBeforeFinalizeBtn.hidden = false;
+            return;
+        }
+        finalizeMessage.textContent = 'Repuestos y fotos verificados. Puedes preparar el correo.';
+        continueFinalizeBtn.hidden = false;
     };
 
     const updateUserDisplay = () => {
@@ -125,8 +175,26 @@ document.addEventListener('DOMContentLoaded', () => {
         updateQuoteCard();
     };
 
+    const statusOrder = {
+        CAMBIO: 0,
+        RECUPERACION: 1,
+        FUERTE: 2,
+        MEDIO: 3,
+        LEVE: 4
+    };
+
     // Función para renderizar la tabla desde el array quoteItems
     const renderTable = () => {
+        quoteItems = quoteItems
+            .map((item, index) => ({ item, index }))
+            .sort((a, b) => {
+                const statusA = String(a.item.estado || '').trim().toUpperCase();
+                const statusB = String(b.item.estado || '').trim().toUpperCase();
+                const orderA = statusOrder[statusA] ?? 5;
+                const orderB = statusOrder[statusB] ?? 5;
+                return orderA - orderB || a.index - b.index;
+            })
+            .map(({ item }) => item);
         itemsTableBody.innerHTML = '';
         updatePartSuggestions(descripInput.value);
 
@@ -726,6 +794,14 @@ document.addEventListener('DOMContentLoaded', () => {
     if (newQuoteBtn) {
         newQuoteBtn.addEventListener('click', handleNewQuote);
     }
+    finalizeQuoteBtn.addEventListener('click', openFinalizeModal);
+    cancelFinalizeBtn.addEventListener('click', () => { finalizeModal.hidden = true; });
+    downloadBeforeFinalizeBtn.addEventListener('click', () => {
+        window.location.href = `fotos.html?placa=${encodeURIComponent(placaInput.value.trim().toUpperCase())}`;
+    });
+    continueFinalizeBtn.addEventListener('click', () => {
+        window.location.href = 'correo.html';
+    });
 
 /* --- Puente para integración por voz (voice.js) ---
        Expone un API mínima para que voice.js registre/elimine ítems
