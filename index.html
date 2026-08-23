@@ -1,0 +1,191 @@
+﻿<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>COTIZACION</title>
+    <link rel="stylesheet" href="Styles.Css">
+    <script src="https://cdn.jsdelivr.net/npm/exceljs@4.3.0/dist/exceljs.min.js"></script>
+
+</head>
+<body>
+    <header class="site-header">
+        <div class="header-left">
+            <img src="assets/app_icon_512.png" alt="App icon" class="app-icon">
+            <div class="app-name">BitAuto</div>
+        </div>
+        <button type="button" id="userNameDisplay" class="user-name-display" aria-label="Editar usuario"></button>
+        <h1 class="site-title">COTIZACION</h1>
+    </header>
+    <input type="hidden" id="fecha" name="fecha">
+    <section id="quoteSummary" class="quote-card" hidden aria-live="polite">
+        <div class="quote-card-heading">
+            <div>
+                <h2>Vehículo</h2>
+            </div>
+        </div>
+        <dl class="quote-details">
+            <div><dt>FECHA</dt><dd id="quoteDateDisplay"></dd></div>
+            <div><dt>PLACA</dt><dd id="quotePlaca"></dd></div>
+            <div><dt>MARCA</dt><dd id="quoteMarca"></dd></div>
+            <div><dt>LINEA</dt><dd id="quoteLinea"></dd></div>
+            <div><dt>MODELO</dt><dd id="quoteModelo"></dd></div>
+            <div><dt>COLOR</dt><dd id="quoteColor"></dd></div>
+            <div><dt>TIPO DE CLIENTE</dt><dd id="quoteTipoCliente"></dd></div>
+            <div id="quoteCilindrajeDetail"><dt>CILINDRAJE</dt><dd id="quoteCilindraje"></dd></div>
+            <div id="quoteVinDetail"><dt>VIN</dt><dd id="quoteVin"></dd></div>
+        </dl>
+    </section>
+
+    <div class="contdat">
+        <div class="cont_izq">
+            <div class="desc">
+                <label for="descrip"></label>
+                <input type="text" id="descrip" name="descrip" placeholder="DESCRIPCION">
+            </div>
+            <div class="cant">
+                <label for="cant"></label>
+                <input type="text" id="cant" name="cant" placeholder="CANT">
+            </div>
+            <div class="dym">
+                <label for="dym"></label>
+                <select id="dym" name="dym">
+                    <option value="">DYM</option> <option value="Si">Si</option>
+                    <option value="No">No</option>
+                </select>
+            </div>         
+        </div>
+        
+        <div class="cont_der">
+            <div class="estado">
+                <label for="estado"></label>
+                <select id="estado" name="estado">
+                    <option value="">ESTADO</option> <option value="Cambio">CAMBIO </option>
+                    <option value="FUERTE">FUERTE</option>
+                    <option value="MEDIO">MEDIO</option>
+                    <option value="LEVE">LEVE</option>
+                    <option value="RECUPERACION">RECUPERACION</option>
+                </select>
+            </div>
+            <div class="pint">
+                <label for="pint"></label>
+                <select id="pint" name="pint">
+                    <option value="">PINT</option> <option value="Si">Si</option>
+                    <option value="No">No</option>
+                </select>
+            </div>
+            <div class="dat">
+                <label for="dat"></label>
+                <input type="text" id="dat" name="dat" placeholder="DATO">
+            </div>
+            <div class="add-item-container">
+                <button id="addItemBtn" class="add-item-button">Agregar</button>
+            </div>   
+        </div>
+    </div>
+
+    <!-- Panel de dictado por voz -->
+    <div class="voice-panel">
+        <div class="voice-controls">
+            <button type="button" id="voiceBtn" class="voice-button" title="Iniciar dictado por voz">🎤</button>
+            <div id="voiceStatus" class="voice-status">Dictado por voz activado. Pulsa para escuchar.</div>
+        </div>
+        <div id="voiceDrawer" class="voice-drawer" aria-live="polite">
+            <span class="voice-hint">Aqui se mostrara lo que digas. Solo reacciona a la palabra <strong>"escribe"</strong>: di, por ejemplo, <strong>"escribe parachoques delantero uno cambio pintura"</strong>. El resto del ruido se ignora.</span>
+        </div>
+    </div>
+
+    <h2 class="lista-titulo">LISTA</h2>
+    <div class="table-container">
+        <table id="itemsTable">
+            <thead>
+                <tr>
+                    <th>Descripción</th>
+                    <th>Cant</th>
+                    <th>Estado</th>
+                    <th>Pint</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="img">
+        <img class="cecxel" id="cecxel" src="/assets/ecxel.png" alt="">
+        <img class="crearex" id="crearex" src="/assets/suzu.png" alt="">
+    </div>
+
+    <div class="final-action-row">
+        <button id="newQuoteBtn" class="secondary-button">Nueva cotización</button>
+        <a id="photosLink" class="secondary-button" href="fotos.html">Abrir fotos</a>
+    </div>
+
+    <div id="userModal" class="user-modal" role="dialog" aria-modal="true" aria-labelledby="user-title" hidden>
+        <div class="user-modal-content">
+            <h2 id="user-title">CREAR USUARIO</h2>
+            <form id="userForm" class="user-fields">
+                <div class="user-field">
+                    <label for="nombreCompleto">NOMBRE COMPLETO</label>
+                    <input type="text" id="nombreCompleto" name="nombreCompleto" autocomplete="name" required>
+                </div>
+                <div class="user-field">
+                    <label for="especialidad">ESPECIALIDAD</label>
+                    <input type="text" id="especialidad" name="especialidad" required>
+                </div>
+                <div class="user-field">
+                    <label for="empresa">EMPRESA</label>
+                    <input type="text" id="empresa" name="empresa" autocomplete="organization" required>
+                </div>
+                <button type="submit" class="secondary-button user-submit">Guardar usuario</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="quoteModal" class="user-modal" role="dialog" aria-modal="true" aria-labelledby="quote-title" hidden>
+        <div class="user-modal-content quote-modal-content">
+            <h2 id="quote-title">NUEVA COTIZACION</h2>
+            <form id="quoteForm" class="user-fields">
+                <div class="user-field">
+                    <label for="placa">PLACA</label>
+                    <input type="text" id="placa" name="placa" required>
+                </div>
+                <div class="user-field">
+                    <label for="marca">MARCA</label>
+                    <input type="text" id="marca" name="marca" required>
+                </div>
+                <div class="user-field">
+                    <label for="linea">LINEA</label>
+                    <input type="text" id="linea" name="linea" required>
+                </div>
+                <div class="user-field">
+                    <label for="modelo">MODELO</label>
+                    <input type="text" id="modelo" name="modelo" required>
+                </div>
+                <div class="user-field">
+                    <label for="color">COLOR</label>
+                    <input type="text" id="color" name="color" required>
+                </div>
+                <div class="user-field">
+                    <label for="tipoCliente">TIPO DE CLIENTE</label>
+                    <input type="text" id="tipoCliente" name="tipoCliente" required>
+                </div>
+                <div id="cilindrajeField" class="user-field quote-optional-field">
+                    <label for="cilindraje">CILINDRAJE</label>
+                    <input type="text" id="cilindraje" name="cilindraje">
+                </div>
+                <div id="vinField" class="user-field quote-optional-field">
+                    <label for="vin">VIN</label>
+                    <input type="text" id="vin" name="vin">
+                </div>
+                <button type="submit" class="secondary-button user-submit">Crear cotización</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+    <script src="voice.js"></script>
+</body>
+<footer> By JHONATAN BUSTOS OROZCO™</footer>
+</html>
