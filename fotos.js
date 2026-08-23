@@ -32,15 +32,29 @@
         } catch (error) { return []; }
     }
     function updateEditorPartSuggestions(filter = '') {
-        const list = $('editorPartsList');
-        if (!list) return;
+        const menu = $('editorPartsMenu');
+        if (!menu) return;
         const query = filter.trim().toLowerCase();
-        list.innerHTML = '';
+        menu.innerHTML = '';
         savedPartDescriptions().filter((description) => description.toLowerCase().includes(query)).forEach((description) => {
-            const option = document.createElement('option');
+            const option = document.createElement('button');
+            option.type = 'button';
+            option.className = 'editor-part-option';
+            option.setAttribute('role', 'option');
             option.value = description;
-            list.appendChild(option);
+            option.textContent = description;
+            option.addEventListener('click', () => addTextAnnotation(description));
+            menu.appendChild(option);
         });
+        menu.hidden = !menu.children.length;
+    }
+    function addTextAnnotation(value) {
+        if (!value.trim()) return;
+        annotations.push({ type: 'text', text: value.trim() });
+        redraw();
+        $('editorVoiceStatus').textContent = 'Repuesto agregado en la esquina inferior derecha de la foto.';
+        $('editorCommandInput').value = '';
+        $('editorPartsMenu').hidden = true;
     }
     function setStatus(text) { $('photoStatus').textContent = text; }
     function openDatabase() {
@@ -144,7 +158,7 @@
         else if (text.includes('flecha')) { annotationMode = 'arrow'; $('editorVoiceStatus').textContent = 'Modo flecha activo. Dibuja sobre la foto.'; }
         else if (text.includes('limpiar')) { clearDrawing(); $('editorVoiceStatus').textContent = 'Trazos limpiados.'; }
         else if (text.includes('guardar')) saveMarked();
-        else if (value.trim()) { annotations.push({ type: 'text', text: value.trim() }); redraw(); $('editorVoiceStatus').textContent = 'Texto agregado en la esquina inferior derecha de la foto.'; $('editorCommandInput').value = ''; }
+        else if (value.trim()) addTextAnnotation(value);
         else $('editorVoiceStatus').textContent = 'Escribe un texto para agregarlo a la foto.';
     }
 
@@ -152,7 +166,7 @@
         $('plateLabel').textContent = getPlate() ? `PLACA: ${getPlate()}` : 'Sin placa seleccionada';
         try { await openDatabase(); await refresh(); } catch (error) { setStatus('IndexedDB no esta disponible en este navegador.'); return; }
         $('photoInput').addEventListener('change', (event) => processFiles(event, false)); $('detailPhotoInput').addEventListener('change', (event) => processFiles(event, true)); $('downloadPhotosBtn').addEventListener('click', downloadAll); $('cancelDeleteBtn').addEventListener('click', () => { photoPendingDelete = null; $('deleteModal').hidden = true; }); $('confirmDeleteBtn').addEventListener('click', confirmDeletePhoto); $('cancelEditBtn').addEventListener('click', () => { $('photoEditor').hidden = true; }); $('clearDrawingBtn').addEventListener('click', clearDrawing); $('saveMarkedBtn').addEventListener('click', saveMarked);
-        updateEditorPartSuggestions(); $('editorCommandInput').addEventListener('input', (event) => updateEditorPartSuggestions(event.target.value)); const canvas = $('photoCanvas'); canvas.addEventListener('pointerdown', startDraw); canvas.addEventListener('pointermove', continueDraw); canvas.addEventListener('pointerup', finishDraw); canvas.addEventListener('pointercancel', finishDraw); const context = canvas.getContext('2d'); context.strokeStyle = '#ef2222'; context.lineWidth = annotationStrokeWidth(); context.lineCap = 'round'; $('editorCommandInput').addEventListener('keydown', (event) => { if (event.key === 'Enter') applyEditorCommand(event.target.value); });
+        $('togglePartsBtn').addEventListener('click', () => { updateEditorPartSuggestions($('editorCommandInput').value); $('editorPartsMenu').hidden = !$('editorPartsMenu').hidden; }); $('editorCommandInput').addEventListener('input', (event) => updateEditorPartSuggestions(event.target.value)); const canvas = $('photoCanvas'); canvas.addEventListener('pointerdown', startDraw); canvas.addEventListener('pointermove', continueDraw); canvas.addEventListener('pointerup', finishDraw); canvas.addEventListener('pointercancel', finishDraw); const context = canvas.getContext('2d'); context.strokeStyle = '#ef2222'; context.lineWidth = annotationStrokeWidth(); context.lineCap = 'round'; $('editorCommandInput').addEventListener('keydown', (event) => { if (event.key === 'Enter') applyEditorCommand(event.target.value); });
     }
     window.descargarFotosMasivas = downloadAll;
     document.addEventListener('DOMContentLoaded', init);
