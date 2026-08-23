@@ -19,7 +19,7 @@
     let moveOffset;
     let annotationMode = 'auto';
     let photoPendingDelete;
-    const annotationStrokeWidth = () => Math.max(10, Math.min(24, Math.max($('photoCanvas').width, $('photoCanvas').height) / 160));
+    const annotationStrokeWidth = () => Math.max(16, Math.min(38, Math.max($('photoCanvas').width, $('photoCanvas').height) / 105));
 
     function getPlate() {
         if (params.get('placa')) return params.get('placa').trim().toUpperCase();
@@ -96,6 +96,11 @@
         if (!getPlate()) { setStatus('No hay placa activa.'); return; }
         try { for (const file of event.target.files) await save({ placaVehiculo: getPlate(), blob: await compress(file), marked: false, createdAt: Date.now() }); await refresh(); if (openDetail && photos.length) openEditor(photos[photos.length - 1]); } catch (error) { setStatus(`No se pudo guardar la foto: ${error.message}`); }
         event.target.value = '';
+        if (!openDetail && photos.length) {
+            window.setTimeout(() => {
+                if (window.confirm('Foto guardada. ¿Deseas tomar otra foto?')) $('photoInput').click();
+            }, 0);
+        }
     }
     function pointFromEvent(event) { const canvas = $('photoCanvas'); const rect = canvas.getBoundingClientRect(); return { x: (event.clientX - rect.left) * canvas.width / rect.width, y: (event.clientY - rect.top) * canvas.height / rect.height }; }
     function drawAnnotations() {

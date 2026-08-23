@@ -20,14 +20,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const cilindrajeInput = document.getElementById('cilindraje');
     const vinInput = document.getElementById('vin');
     const nombreCompletoInput = document.getElementById('nombreCompleto');
-    const especialidadInput = document.getElementById('especialidad');
-    const empresaInput = document.getElementById('empresa');
     const userForm = document.getElementById('userForm');
     const userModal = document.getElementById('userModal');
     const userNameDisplay = document.getElementById('userNameDisplay');
     const quoteForm = document.getElementById('quoteForm');
     const quoteModal = document.getElementById('quoteModal');
     const quoteSummary = document.getElementById('quoteSummary');
+    const editQuoteBtn = document.getElementById('editQuoteBtn');
+    const quoteTitle = document.getElementById('quote-title');
+    const quoteSubmitBtn = document.getElementById('quoteSubmitBtn');
     const newQuoteBtn = document.getElementById('newQuoteBtn');
     const photosLink = document.getElementById('photosLink');
     const newQuoteWarningModal = document.getElementById('newQuoteWarningModal');
@@ -58,9 +59,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 tipoCliente: tipoClienteInput.value.trim(),
                 cilindraje: cilindrajeInput.value.trim(),
                 vin: vinInput.value.trim(),
-                nombreCompleto: nombreCompletoInput.value.trim(),
-                especialidad: especialidadInput.value.trim(),
-                empresa: empresaInput.value.trim()
+                nombreCompleto: nombreCompletoInput.value.trim()
             },
             quoteItems
         };
@@ -114,8 +113,10 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('quoteCilindrajeDetail').hidden = cilindrajeInput.disabled;
         document.getElementById('quoteVinDetail').hidden = vinInput.disabled;
     };
-    const openQuoteModal = () => {
+    const openQuoteModal = (isEditing = false) => {
         quoteModal.hidden = false;
+        quoteTitle.textContent = isEditing ? 'EDITAR COTIZACION' : 'NUEVA COTIZACION';
+        quoteSubmitBtn.textContent = isEditing ? 'Guardar cambios' : 'Crear cotización';
         toggleFields();
         placaInput.focus();
     };
@@ -221,8 +222,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 cilindrajeInput.value = state.fields.cilindraje || '';
                 vinInput.value = state.fields.vin || '';
                 nombreCompletoInput.value = state.fields.nombreCompleto || '';
-                especialidadInput.value = state.fields.especialidad || '';
-                empresaInput.value = state.fields.empresa || '';
             }
 
             quoteItems = Array.isArray(state.quoteItems) ? state.quoteItems : [];
@@ -253,8 +252,6 @@ document.addEventListener('DOMContentLoaded', () => {
         cilindrajeInput,
         vinInput,
         nombreCompletoInput,
-        especialidadInput,
-        empresaInput
     ];
 
     const uppercaseFields = [placaInput, marcaInput, lineaInput, colorInput, tipoClienteInput];
@@ -266,11 +263,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     uppercaseFields.forEach((field) => {
         if (field) {
-            field.addEventListener('input', () => {
-                const cursorPosition = field.selectionStart;
+            field.addEventListener('input', saveState);
+            field.addEventListener('blur', () => {
                 field.value = field.value.toUpperCase();
-                field.setSelectionRange(cursorPosition, cursorPosition);
                 saveState();
+                updateQuoteCard();
             });
         }
     });
@@ -292,9 +289,11 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     userNameDisplay.addEventListener('click', openUserModal);
+    editQuoteBtn.addEventListener('click', () => openQuoteModal(true));
     quoteForm.addEventListener('submit', (event) => {
         event.preventDefault();
         if (!quoteForm.reportValidity()) return;
+        normalizeUppercaseFields();
         fechaInput.value = getToday();
         saveState();
         updateQuoteCard();

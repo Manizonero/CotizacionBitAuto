@@ -23,6 +23,7 @@
             <div>
                 <h2>Vehículo</h2>
             </div>
+            <button type="button" id="editQuoteBtn" class="icon-button" title="Editar datos del vehículo" aria-label="Editar datos del vehículo">✎</button>
         </div>
         <dl class="quote-details">
             <div><dt>FECHA</dt><dd id="quoteDateDisplay"></dd></div>
@@ -131,14 +132,6 @@
                     <label for="nombreCompleto">NOMBRE COMPLETO</label>
                     <input type="text" id="nombreCompleto" name="nombreCompleto" autocomplete="name" required>
                 </div>
-                <div class="user-field">
-                    <label for="especialidad">ESPECIALIDAD</label>
-                    <input type="text" id="especialidad" name="especialidad" required>
-                </div>
-                <div class="user-field">
-                    <label for="empresa">EMPRESA</label>
-                    <input type="text" id="empresa" name="empresa" autocomplete="organization" required>
-                </div>
                 <button type="submit" class="secondary-button user-submit">Guardar usuario</button>
             </form>
         </div>
@@ -150,7 +143,7 @@
             <form id="quoteForm" class="user-fields">
                 <div class="user-field">
                     <label for="placa">PLACA</label>
-                    <input type="text" id="placa" name="placa" required>
+                    <input type="text" id="placa" name="placa" inputmode="text" autocapitalize="characters" autocomplete="off" maxlength="10" required>
                 </div>
                 <div class="user-field">
                     <label for="marca">MARCA</label>
@@ -180,7 +173,7 @@
                     <label for="vin">VIN</label>
                     <input type="text" id="vin" name="vin">
                 </div>
-                <button type="submit" class="secondary-button user-submit">Crear cotización</button>
+                <button type="submit" id="quoteSubmitBtn" class="secondary-button user-submit">Crear cotización</button>
             </form>
         </div>
     </div>
