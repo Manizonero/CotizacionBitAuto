@@ -19,6 +19,9 @@
     let moveOffset;
     let annotationMode = 'auto';
     let photoPendingDelete;
+    let pendingCapture;
+    let captureQueue = [];
+    let captureReviewUrl;
     const annotationStrokeWidth = () => Math.max(16, Math.min(38, Math.max($('photoCanvas').width, $('photoCanvas').height) / 105));
 
     function getPlate() {
@@ -92,15 +95,59 @@
         render();
         setStatus(getPlate() ? `${photos.length} fotos guardadas localmente para ${getPlate()}.` : 'Vuelve a la cotizacion y registra una placa.');
     }
+    function openCamera() {
+        if (!$('photoInput') || !getPlate()) return;
+        window.setTimeout(() => $('photoInput').click(), 120);
+    }
+    function showCaptureReview(blob) {
+        pendingCapture = blob;
+        if (captureReviewUrl) URL.revokeObjectURL(captureReviewUrl);
+        captureReviewUrl = URL.createObjectURL(blob);
+        $('captureReviewImage').src = captureReviewUrl;
+        $('captureReview').hidden = false;
+        $('captureReview').scrollIntoView({ behavior: 'smooth', block: 'center' });
+        $('captureReviewStatus').textContent = captureQueue.length ? `${captureQueue.length} foto(s) esperando revisión.` : 'La cámara continuará activa después de elegir una opción.';
+    }
+    function closeCaptureReview() {
+        $('captureReview').hidden = true;
+        $('captureReviewImage').removeAttribute('src');
+        if (captureReviewUrl) URL.revokeObjectURL(captureReviewUrl);
+        captureReviewUrl = null;
+        pendingCapture = null;
+    }
+    function reviewNextCapture() {
+        if (!captureQueue.length) {
+            closeCaptureReview();
+            openCamera();
+            return;
+        }
+        const nextFile = captureQueue.shift();
+        compress(nextFile).then(showCaptureReview).catch((error) => setStatus(`No se pudo preparar la foto: ${error.message}`));
+    }
+    async function confirmCapture() {
+        if (!pendingCapture) return;
+        try {
+            await save({ placaVehiculo: getPlate(), blob: pendingCapture, marked: false, createdAt: Date.now() });
+            await refresh();
+            reviewNextCapture();
+        } catch (error) {
+            setStatus(`No se pudo guardar la foto: ${error.message}`);
+        }
+    }
+    function discardCapture() {
+        reviewNextCapture();
+    }
     async function processFiles(event, openDetail) {
         if (!getPlate()) { setStatus('No hay placa activa.'); return; }
-        try { for (const file of event.target.files) await save({ placaVehiculo: getPlate(), blob: await compress(file), marked: false, createdAt: Date.now() }); await refresh(); if (openDetail && photos.length) openEditor(photos[photos.length - 1]); } catch (error) { setStatus(`No se pudo guardar la foto: ${error.message}`); }
-        event.target.value = '';
-        if (!openDetail && photos.length) {
-            window.setTimeout(() => {
-                if (window.confirm('Foto guardada. ¿Deseas tomar otra foto?')) $('photoInput').click();
-            }, 0);
+        const files = Array.from(event.target.files || []);
+        if (!files.length) return;
+        if (openDetail) {
+            try { for (const file of files) await save({ placaVehiculo: getPlate(), blob: await compress(file), marked: false, createdAt: Date.now() }); await refresh(); if (photos.length) openEditor(photos[photos.length - 1]); } catch (error) { setStatus(`No se pudo guardar la foto: ${error.message}`); }
+        } else {
+            captureQueue = files.slice(1);
+            try { showCaptureReview(await compress(files[0])); } catch (error) { setStatus(`No se pudo preparar la foto: ${error.message}`); }
         }
+        event.target.value = '';
     }
     function pointFromEvent(event) { const canvas = $('photoCanvas'); const rect = canvas.getBoundingClientRect(); return { x: (event.clientX - rect.left) * canvas.width / rect.width, y: (event.clientY - rect.top) * canvas.height / rect.height }; }
     function drawAnnotations() {
@@ -160,7 +207,7 @@
     async function init() {
         $('plateLabel').textContent = getPlate() ? `PLACA: ${getPlate()}` : 'Sin placa seleccionada';
         try { await openDatabase(); await refresh(); } catch (error) { setStatus('IndexedDB no esta disponible en este navegador.'); return; }
-        $('photoInput').addEventListener('change', (event) => processFiles(event, false)); $('detailPhotoInput').addEventListener('change', (event) => processFiles(event, true)); $('downloadPhotosBtn').addEventListener('click', downloadAll); $('cancelDeleteBtn').addEventListener('click', () => { photoPendingDelete = null; $('deleteModal').hidden = true; }); $('confirmDeleteBtn').addEventListener('click', confirmDeletePhoto); $('cancelEditBtn').addEventListener('click', () => { $('photoEditor').hidden = true; }); $('clearDrawingBtn').addEventListener('click', clearDrawing); $('saveMarkedBtn').addEventListener('click', saveMarked);
+        $('photoInput').addEventListener('change', (event) => processFiles(event, false)); $('detailPhotoInput').addEventListener('change', (event) => processFiles(event, true)); $('confirmCaptureBtn').addEventListener('click', confirmCapture); $('discardCaptureBtn').addEventListener('click', discardCapture); $('downloadPhotosBtn').addEventListener('click', downloadAll); $('cancelDeleteBtn').addEventListener('click', () => { photoPendingDelete = null; $('deleteModal').hidden = true; }); $('confirmDeleteBtn').addEventListener('click', confirmDeletePhoto); $('cancelEditBtn').addEventListener('click', () => { $('photoEditor').hidden = true; }); $('clearDrawingBtn').addEventListener('click', clearDrawing); $('saveMarkedBtn').addEventListener('click', saveMarked);
         const commandInput = $('editorCommandInput'); const partsMenu = $('editorPartsMenu'); commandInput.addEventListener('click', () => { updateEditorPartSuggestions(''); partsMenu.hidden = !partsMenu.children.length; }); const canvas = $('photoCanvas'); canvas.addEventListener('pointerdown', startDraw); canvas.addEventListener('pointermove', continueDraw); canvas.addEventListener('pointerup', finishDraw); canvas.addEventListener('pointercancel', finishDraw); const context = canvas.getContext('2d'); context.strokeStyle = '#ef2222'; context.lineWidth = annotationStrokeWidth(); context.lineCap = 'round';
     }
     window.descargarFotosMasivas = downloadAll;

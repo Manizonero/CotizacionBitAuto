@@ -29,6 +29,20 @@
             </div>
             <div id="photoGrid" class="photo-grid" aria-live="polite"></div>
         </section>
+        <section id="captureReview" class="capture-review" hidden aria-labelledby="capture-review-title">
+            <div class="capture-review-heading">
+                <div>
+                    <p class="eyebrow">REVISA LA CAPTURA</p>
+                    <h2 id="capture-review-title">¿Guardar esta foto?</h2>
+                </div>
+                <p id="captureReviewStatus" aria-live="polite">La cámara continuará activa después de elegir una opción.</p>
+            </div>
+            <div class="capture-review-image-wrap"><img id="captureReviewImage" class="capture-review-image" alt="Vista previa de la foto tomada"></div>
+            <div class="capture-review-actions">
+                <button id="discardCaptureBtn" class="capture-decision discard" type="button" aria-label="Descartar foto y tomar otra foto" title="Descartar y tomar otra foto">✕</button>
+                <button id="confirmCaptureBtn" class="capture-decision confirm" type="button" aria-label="Guardar foto y tomar otra foto" title="Guardar y tomar otra foto">✓</button>
+            </div>
+        </section>
         <a class="nav-button data-link" href="index.html">Datos</a>
     </main>
 
