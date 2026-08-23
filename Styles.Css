@@ -545,6 +545,8 @@ label {
 
 .photos-link {
     text-decoration: none;
+    border: 2px solid #4b859c;
+    background-color: #ffffff;
 }
 
 /* Título de la lista de ítems */
