@@ -25,6 +25,23 @@
         if (params.get('placa')) return params.get('placa').trim().toUpperCase();
         try { return (JSON.parse(localStorage.getItem('coticarQuoteState'))?.fields?.placa || '').trim().toUpperCase(); } catch (error) { return ''; }
     }
+    function savedPartDescriptions() {
+        try {
+            const state = JSON.parse(localStorage.getItem('coticarQuoteState'));
+            return [...new Set((Array.isArray(state?.quoteItems) ? state.quoteItems : []).map((item) => item.descrip?.trim()).filter(Boolean))];
+        } catch (error) { return []; }
+    }
+    function updateEditorPartSuggestions(filter = '') {
+        const list = $('editorPartsList');
+        if (!list) return;
+        const query = filter.trim().toLowerCase();
+        list.innerHTML = '';
+        savedPartDescriptions().filter((description) => description.toLowerCase().includes(query)).forEach((description) => {
+            const option = document.createElement('option');
+            option.value = description;
+            list.appendChild(option);
+        });
+    }
     function setStatus(text) { $('photoStatus').textContent = text; }
     function openDatabase() {
         return new Promise((resolve, reject) => {
@@ -135,7 +152,7 @@
         $('plateLabel').textContent = getPlate() ? `PLACA: ${getPlate()}` : 'Sin placa seleccionada';
         try { await openDatabase(); await refresh(); } catch (error) { setStatus('IndexedDB no esta disponible en este navegador.'); return; }
         $('photoInput').addEventListener('change', (event) => processFiles(event, false)); $('detailPhotoInput').addEventListener('change', (event) => processFiles(event, true)); $('downloadPhotosBtn').addEventListener('click', downloadAll); $('cancelDeleteBtn').addEventListener('click', () => { photoPendingDelete = null; $('deleteModal').hidden = true; }); $('confirmDeleteBtn').addEventListener('click', confirmDeletePhoto); $('cancelEditBtn').addEventListener('click', () => { $('photoEditor').hidden = true; }); $('clearDrawingBtn').addEventListener('click', clearDrawing); $('saveMarkedBtn').addEventListener('click', saveMarked);
-        const canvas = $('photoCanvas'); canvas.addEventListener('pointerdown', startDraw); canvas.addEventListener('pointermove', continueDraw); canvas.addEventListener('pointerup', finishDraw); canvas.addEventListener('pointercancel', finishDraw); const context = canvas.getContext('2d'); context.strokeStyle = '#ef2222'; context.lineWidth = annotationStrokeWidth(); context.lineCap = 'round'; $('editorCommandInput').addEventListener('keydown', (event) => { if (event.key === 'Enter') applyEditorCommand(event.target.value); });
+        updateEditorPartSuggestions(); $('editorCommandInput').addEventListener('input', (event) => updateEditorPartSuggestions(event.target.value)); const canvas = $('photoCanvas'); canvas.addEventListener('pointerdown', startDraw); canvas.addEventListener('pointermove', continueDraw); canvas.addEventListener('pointerup', finishDraw); canvas.addEventListener('pointercancel', finishDraw); const context = canvas.getContext('2d'); context.strokeStyle = '#ef2222'; context.lineWidth = annotationStrokeWidth(); context.lineCap = 'round'; $('editorCommandInput').addEventListener('keydown', (event) => { if (event.key === 'Enter') applyEditorCommand(event.target.value); });
     }
     window.descargarFotosMasivas = downloadAll;
     document.addEventListener('DOMContentLoaded', init);
