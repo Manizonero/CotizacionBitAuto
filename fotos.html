@@ -22,12 +22,20 @@
                 <strong id="photoCount">0 fotos</strong>
             </div>
             <div class="capture-actions">
-                <label class="action-button primary" for="photoInput">Tomar foto</label>
+                <button id="startCameraBtn" class="action-button primary" type="button">Tomar foto</button>
                 <input id="photoInput" class="visually-hidden" type="file" accept="image/*" capture="environment" multiple>
                 <input id="detailPhotoInput" class="visually-hidden" type="file" accept="image/*" capture="environment">
                 <button id="downloadPhotosBtn" class="action-button" type="button">Descargar fotos</button>
             </div>
             <div id="photoGrid" class="photo-grid" aria-live="polite"></div>
+        </section>
+        <section id="cameraSession" class="camera-session" hidden aria-label="Camara activa">
+            <div class="camera-frame"><video id="cameraVideo" autoplay playsinline muted></video></div>
+            <canvas id="cameraCanvas" class="visually-hidden"></canvas>
+            <div class="camera-controls">
+                <button id="capturePhotoBtn" class="camera-shutter" type="button" aria-label="Tomar foto" title="Tomar foto">●</button>
+                <button id="closeCameraBtn" class="camera-close" type="button" aria-label="Cerrar cámara" title="Cerrar cámara">✕</button>
+            </div>
         </section>
         <section id="captureReview" class="capture-review" hidden aria-labelledby="capture-review-title">
             <div class="capture-review-heading">

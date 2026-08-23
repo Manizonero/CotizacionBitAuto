@@ -22,6 +22,7 @@
     let pendingCapture;
     let captureQueue = [];
     let captureReviewUrl;
+    let cameraStream;
     const annotationStrokeWidth = () => Math.max(16, Math.min(38, Math.max($('photoCanvas').width, $('photoCanvas').height) / 105));
 
     function getPlate() {
@@ -95,9 +96,44 @@
         render();
         setStatus(getPlate() ? `${photos.length} fotos guardadas localmente para ${getPlate()}.` : 'Vuelve a la cotizacion y registra una placa.');
     }
+    async function startCamera() {
+        if (!getPlate()) { setStatus('No hay placa activa.'); return; }
+        if (!navigator.mediaDevices?.getUserMedia) { setStatus('La cámara integrada requiere HTTPS o un navegador compatible.'); $('photoInput').click(); return; }
+        try {
+            cameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false });
+            $('cameraVideo').srcObject = cameraStream;
+            $('cameraSession').hidden = false;
+            $('cameraVideo').hidden = false;
+            $('capturePhotoBtn').hidden = false;
+            $('captureReview').hidden = true;
+            await $('cameraVideo').play();
+        } catch (error) {
+            setStatus('No se pudo activar la cámara. Revisa el permiso del navegador.');
+            $('photoInput').click();
+        }
+    }
+    function stopCamera() {
+        if (cameraStream) cameraStream.getTracks().forEach((track) => track.stop());
+        cameraStream = null;
+        $('cameraVideo').srcObject = null;
+        $('cameraSession').hidden = true;
+    }
     function openCamera() {
-        if (!$('photoInput') || !getPlate()) return;
-        window.setTimeout(() => $('photoInput').click(), 120);
+        startCamera();
+    }
+    function capturePhoto() {
+        const video = $('cameraVideo');
+        const canvas = $('cameraCanvas');
+        if (!cameraStream || !video.videoWidth) return;
+        canvas.width = Math.min(MAX_WIDTH, video.videoWidth);
+        canvas.height = Math.round(video.videoHeight * canvas.width / video.videoWidth);
+        canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob((blob) => {
+            if (!blob) return;
+            $('cameraVideo').hidden = true;
+            $('capturePhotoBtn').hidden = true;
+            showCaptureReview(blob);
+        }, 'image/jpeg', JPEG_QUALITY);
     }
     function showCaptureReview(blob) {
         pendingCapture = blob;
@@ -118,7 +154,9 @@
     function reviewNextCapture() {
         if (!captureQueue.length) {
             closeCaptureReview();
-            openCamera();
+            $('cameraVideo').hidden = false;
+            $('capturePhotoBtn').hidden = false;
+            if (!cameraStream) openCamera();
             return;
         }
         const nextFile = captureQueue.shift();
@@ -207,7 +245,7 @@
     async function init() {
         $('plateLabel').textContent = getPlate() ? `PLACA: ${getPlate()}` : 'Sin placa seleccionada';
         try { await openDatabase(); await refresh(); } catch (error) { setStatus('IndexedDB no esta disponible en este navegador.'); return; }
-        $('photoInput').addEventListener('change', (event) => processFiles(event, false)); $('detailPhotoInput').addEventListener('change', (event) => processFiles(event, true)); $('confirmCaptureBtn').addEventListener('click', confirmCapture); $('discardCaptureBtn').addEventListener('click', discardCapture); $('downloadPhotosBtn').addEventListener('click', downloadAll); $('cancelDeleteBtn').addEventListener('click', () => { photoPendingDelete = null; $('deleteModal').hidden = true; }); $('confirmDeleteBtn').addEventListener('click', confirmDeletePhoto); $('cancelEditBtn').addEventListener('click', () => { $('photoEditor').hidden = true; }); $('clearDrawingBtn').addEventListener('click', clearDrawing); $('saveMarkedBtn').addEventListener('click', saveMarked);
+        $('photoInput').addEventListener('change', (event) => processFiles(event, false)); $('detailPhotoInput').addEventListener('change', (event) => processFiles(event, true)); $('startCameraBtn').addEventListener('click', startCamera); $('capturePhotoBtn').addEventListener('click', capturePhoto); $('closeCameraBtn').addEventListener('click', stopCamera); $('confirmCaptureBtn').addEventListener('click', confirmCapture); $('discardCaptureBtn').addEventListener('click', discardCapture); $('downloadPhotosBtn').addEventListener('click', downloadAll); $('cancelDeleteBtn').addEventListener('click', () => { photoPendingDelete = null; $('deleteModal').hidden = true; }); $('confirmDeleteBtn').addEventListener('click', confirmDeletePhoto); $('cancelEditBtn').addEventListener('click', () => { $('photoEditor').hidden = true; }); $('clearDrawingBtn').addEventListener('click', clearDrawing); $('saveMarkedBtn').addEventListener('click', saveMarked);
         const commandInput = $('editorCommandInput'); const partsMenu = $('editorPartsMenu'); commandInput.addEventListener('click', () => { updateEditorPartSuggestions(''); partsMenu.hidden = !partsMenu.children.length; }); const canvas = $('photoCanvas'); canvas.addEventListener('pointerdown', startDraw); canvas.addEventListener('pointermove', continueDraw); canvas.addEventListener('pointerup', finishDraw); canvas.addEventListener('pointercancel', finishDraw); const context = canvas.getContext('2d'); context.strokeStyle = '#ef2222'; context.lineWidth = annotationStrokeWidth(); context.lineCap = 'round';
     }
     window.descargarFotosMasivas = downloadAll;
