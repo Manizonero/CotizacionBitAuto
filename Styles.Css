@@ -530,12 +530,12 @@ label {
 }
 
 .final-action-row {
-    width: 90%;
-    max-width: 1120px;
+    width: min(90%, 500px);
     margin: 0 auto 40px auto;
-    display: flex;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 16px;
-    justify-content: flex-start;
+    justify-content: center;
 }
 
 
@@ -565,6 +565,17 @@ label {
 .nav-button { display: inline-block; padding: 12px 22px; border: 2px solid #4b859c; border-radius: 16px; color: #24314c; background-color: #ffffff; font: 600 16px "Oxanium", sans-serif; line-height: normal; text-decoration: none; }
 .nav-button:hover { transform: translateY(-1px); opacity: 0.95; background-color: #f1f8fb; }
 .photos-link { text-decoration: none; }
+.final-action-row .secondary-button,
+.final-action-row .nav-button {
+    grid-column: span 2;
+    width: 100%;
+    min-height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+}
+.finalize-button { grid-column: 2 / span 2; justify-self: center; }
 
 /* Título de la lista de ítems */
 .lista-titulo {

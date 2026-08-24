@@ -183,6 +183,12 @@ document.addEventListener('DOMContentLoaded', () => {
         LEVE: 4
     };
 
+    const setSelectValue = (select, value) => {
+        const normalizedValue = String(value || '').trim().toUpperCase();
+        const option = [...select.options].find((item) => item.value.trim().toUpperCase() === normalizedValue);
+        select.value = option ? option.value : '';
+    };
+
     // Función para renderizar la tabla desde el array quoteItems
     const renderTable = () => {
         quoteItems = quoteItems
@@ -230,11 +236,11 @@ document.addEventListener('DOMContentLoaded', () => {
             editButton.addEventListener('click', () => {
                 descripInput.value = item.descrip;
                 cantInput.value = item.cant;
-                dymInput.value = item.dym;
-                estadoInput.value = item.estado;
-                pintInput.value = item.pint;
+                setSelectValue(dymInput, item.dym);
+                setSelectValue(estadoInput, item.estado);
+                setSelectValue(pintInput, item.pint);
                 datInput.value = item.dat;
-                editingIndex = index;
+                editingItem = item;
                 addItemButton.textContent = 'Actualizar';
                 descripInput.focus();
             });
@@ -480,7 +486,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let currentDragTarget = null; 
     let isTouchDragging = false;
-    let editingIndex = null;
+    let editingItem = null;
 
     function handleDragStart(e) {
         draggedRow = this;
@@ -653,9 +659,10 @@ document.addEventListener('DOMContentLoaded', () => {
             dat
         };
 
-        if (editingIndex !== null) {
-            quoteItems[editingIndex] = newItem;
-            editingIndex = null;
+        if (editingItem !== null) {
+            const itemIndex = quoteItems.indexOf(editingItem);
+            if (itemIndex !== -1) quoteItems[itemIndex] = { ...editingItem, ...newItem };
+            editingItem = null;
             addItemButton.textContent = 'Agregar';
         } else {
             quoteItems.push(newItem); 
