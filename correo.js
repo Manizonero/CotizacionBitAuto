@@ -129,7 +129,9 @@
                 ? `intent://compose?${composeQuery}#Intent;scheme=mailto;package=com.google.android.gm;end`
                 : `googlegmail://co?${composeQuery}`;
             window.location.href = gmailAppUrl;
-            setTimeout(() => { window.location.href = mobileWebUrl; }, 1200);
+            setTimeout(() => {
+                if (document.visibilityState === 'visible') window.location.href = mobileWebUrl;
+            }, 1200);
         } else {
             const gmailWindow = window.open(webUrl, '_blank');
             if (!gmailWindow) window.location.href = webUrl;
