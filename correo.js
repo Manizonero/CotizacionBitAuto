@@ -9,6 +9,15 @@
     let contacts = JSON.parse(localStorage.getItem(CONTACTS_KEY) || '[]');
     let settings = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
     const items = Array.isArray(state.quoteItems) ? state.quoteItems : [];
+    const statusOrder = { CAMBIO: 0, RECUPERACION: 1, FUERTE: 2, MEDIO: 3, LEVE: 4 };
+    const orderedItems = items
+        .map((item, index) => ({ item, index }))
+        .sort((a, b) => {
+            const orderA = statusOrder[String(a.item.estado || '').trim().toUpperCase()] ?? 5;
+            const orderB = statusOrder[String(b.item.estado || '').trim().toUpperCase()] ?? 5;
+            return orderA - orderB || a.index - b.index;
+        })
+        .map(({ item }) => item);
     let editingContactIndex = null;
 
     const subject = () => `COTIZACION ${fields.marca || ''} ${fields.placa || ''} ${fields.linea || ''} ${fields.tipoCliente || ''}`.replace(/\s+/g, ' ').trim();
@@ -17,19 +26,19 @@
         const columns = [['No.', 4], ['Descripcion', 30], ['Cantidad', 9], ['Estado', 12], ['Pint.', 7], ['Dato', 18]];
         const line = `+${columns.map(([, width]) => '-'.repeat(width + 2)).join('+')}+`;
         const header = `| ${columns.map(([label, width]) => fitCell(label, width)).join(' | ')} |`;
-        const rows = items.map((item, index) => `| ${[index + 1, item.descrip, item.cant, item.estado, item.pint, item.dat].map((value, columnIndex) => fitCell(value, columns[columnIndex][1])).join(' | ')} |`);
+        const rows = orderedItems.map((item, index) => `| ${[index + 1, item.descrip, item.cant, item.estado, item.pint, item.dat].map((value, columnIndex) => fitCell(value, columns[columnIndex][1])).join(' | ')} |`);
         return [line, header, line, ...rows, line].join('\n');
     };
     const escapeHtml = (value) => String(value || '-').replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]));
     const richBody = () => {
-        const rows = items.length ? items.map((item, index) => { const isChange = String(item.estado || '').trim().toUpperCase() === 'CAMBIO'; const color = isChange ? '#ff0000' : '#000000'; return `<tr style="color:${color};"><td>${index + 1}</td><td>${escapeHtml(item.descrip)}</td><td>${escapeHtml(item.cant)}</td><td>${escapeHtml(item.dym)}</td><td>${escapeHtml(item.estado)}</td><td>${escapeHtml(item.pint)}</td><td>${escapeHtml(item.dat)}</td></tr>`; }).join('') : '<tr><td colspan="7">No hay repuestos registrados.</td></tr>';
+        const rows = orderedItems.length ? orderedItems.map((item, index) => { const isChange = String(item.estado || '').trim().toUpperCase() === 'CAMBIO'; const color = isChange ? '#ff0000' : '#000000'; return `<tr style="color:${color};"><td>${index + 1}</td><td>${escapeHtml(item.descrip)}</td><td>${escapeHtml(item.cant)}</td><td>${escapeHtml(item.dym)}</td><td>${escapeHtml(item.estado)}</td><td>${escapeHtml(item.pint)}</td><td>${escapeHtml(item.dat)}</td></tr>`; }).join('') : '<tr><td colspan="7">No hay repuestos registrados.</td></tr>';
         const headerStyle = 'background-color:#c6dcf0;color:#000000;font-weight:700;';
         const tableStyle = 'border-collapse:collapse;border:1px solid #000000;color:#000000;font-family:Arial,sans-serif;font-size:14px;';
         const cellStyle = 'border:1px solid #000000;padding:6px 8px;';
         return `<div style="color:#000000;font-family:Arial,sans-serif;">${escapeHtml($('greetingInput').value.trim() || 'Cordial saludo,').replace(/\n/g, '<br>')}</div><br><div style="color:#000000;font-family:Arial,sans-serif;"><strong>Datos del vehiculo</strong></div><table border="1" cellpadding="6" cellspacing="0" style="${tableStyle}"><tr style="${headerStyle}"><th style="${cellStyle}">Fecha</th><th style="${cellStyle}">Placa</th><th style="${cellStyle}">Marca</th><th style="${cellStyle}">Linea</th><th style="${cellStyle}">Modelo</th><th style="${cellStyle}">Color</th><th style="${cellStyle}">Tipo de cliente</th></tr><tr style="color:#000000;"><td style="${cellStyle}">${escapeHtml(fields.fecha)}</td><td style="${cellStyle}">${escapeHtml(fields.placa)}</td><td style="${cellStyle}">${escapeHtml(fields.marca)}</td><td style="${cellStyle}">${escapeHtml(fields.linea)}</td><td style="${cellStyle}">${escapeHtml(fields.modelo)}</td><td style="${cellStyle}">${escapeHtml(fields.color)}</td><td style="${cellStyle}">${escapeHtml(fields.tipoCliente)}</td></tr></table><br><div style="color:#000000;font-family:Arial,sans-serif;"><strong>Repuestos solicitados</strong></div><table border="1" cellpadding="6" cellspacing="0" style="${tableStyle}"><thead><tr style="${headerStyle}"><th style="${cellStyle}">N°</th><th style="${cellStyle}">DESCRIPCIÓN</th><th style="${cellStyle}">CANT</th><th style="${cellStyle}">DYM</th><th style="${cellStyle}">NIVEL DAÑO</th><th style="${cellStyle}">PINT</th><th style="${cellStyle}">OBSERVACIÓN</th></tr></thead><tbody>${rows}</tbody></table>`;
     };
     const body = () => {
-        const grid = items.length ? partsGrid() : 'No hay repuestos registrados.';
+        const grid = orderedItems.length ? partsGrid() : 'No hay repuestos registrados.';
         return `${$('greetingInput').value.trim() || 'Cordial saludo,'}\n\nDatos del vehiculo\nFecha: ${fields.fecha || '-'}\nPlaca: ${fields.placa || '-'}\nMarca: ${fields.marca || '-'}\nLinea: ${fields.linea || '-'}\nModelo: ${fields.modelo || '-'}\nColor: ${fields.color || '-'}\nTipo de cliente: ${fields.tipoCliente || '-'}${fields.cilindraje ? `\nCilindraje: ${fields.cilindraje}` : ''}${fields.vin ? `\nVIN: ${fields.vin}` : ''}\n\nRepuestos solicitados\n${grid}`;
     };
     const saveContacts = () => localStorage.setItem(CONTACTS_KEY, JSON.stringify(contacts));
@@ -46,9 +55,9 @@
     };
     const renderItemsTable = () => {
         $('mailItemsTableBody').innerHTML = '';
-        items.forEach((item) => {
+        orderedItems.forEach((item, index) => {
             const row = document.createElement('tr');
-            [String(items.indexOf(item) + 1), item.descrip, item.cant, item.estado, item.pint, item.dat].forEach((value) => {
+            [String(index + 1), item.descrip, item.cant, item.estado, item.pint, item.dat].forEach((value) => {
                 const cell = document.createElement('td');
                 cell.textContent = value || '-';
                 row.appendChild(cell);
@@ -103,7 +112,27 @@
         copySurface.remove();
         if (!copied) throw new Error('El navegador no permitio copiar la tabla');
     };
-    $('openGmailBtn').addEventListener('click', async () => { const selected = contacts.filter((contact) => contact.selected); if (!selected.length) { $('mailStatus').textContent = 'Selecciona al menos un correo.'; return; } const url = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(selected.map((contact) => contact.email).join(','))}&su=${encodeURIComponent($('subjectInput').value)}`; const gmailWindow = window.open('about:blank', '_blank'); try { await copyRichBody(); if (gmailWindow) gmailWindow.location.href = url; $('mailStatus').textContent = 'Tabla copiada. Pegala en el cuerpo del correo de Gmail.'; } catch (error) { if (gmailWindow) gmailWindow.location.href = url; $('mailStatus').textContent = 'Gmail se abrio. Puedes pegar la tabla en el mensaje.'; } });
+    $('openGmailBtn').addEventListener('click', async () => {
+        const selected = contacts.filter((contact) => contact.selected);
+        if (!selected.length) { $('mailStatus').textContent = 'Selecciona al menos un correo.'; return; }
+        const recipients = selected.map((contact) => contact.email).join(',');
+        const subjectValue = $('subjectInput').value;
+        const webUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(recipients)}&su=${encodeURIComponent(subjectValue)}`;
+        const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+        let copied = true;
+        try { await copyRichBody(); } catch (error) { copied = false; }
+        if (isMobile) {
+            const gmailAppUrl = `googlegmail://co?to=${encodeURIComponent(recipients)}&subject=${encodeURIComponent(subjectValue)}`;
+            window.location.href = gmailAppUrl;
+            setTimeout(() => { window.location.href = webUrl; }, 1200);
+        } else {
+            const gmailWindow = window.open(webUrl, '_blank');
+            if (!gmailWindow) window.location.href = webUrl;
+        }
+        $('mailStatus').textContent = copied
+            ? 'Tabla copiada. Pegala en el cuerpo del correo de Gmail.'
+            : 'Gmail se abrio. Copia la tabla manualmente y pegala en el cuerpo del correo.';
+    });
     $('mailVehicleLabel').textContent = `${fields.marca || '-'} ${fields.linea || '-'} / ${fields.placa || '-'}`;
     renderContacts(); updatePreview(); if (!contacts.length) { $('recipientsModal').hidden = false; $('contactForm').hidden = false; $('contactName').focus(); }
 })();

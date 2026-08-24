@@ -175,14 +175,6 @@ document.addEventListener('DOMContentLoaded', () => {
         updateQuoteCard();
     };
 
-    const statusOrder = {
-        CAMBIO: 0,
-        RECUPERACION: 1,
-        FUERTE: 2,
-        MEDIO: 3,
-        LEVE: 4
-    };
-
     const setSelectValue = (select, value) => {
         const normalizedValue = String(value || '').trim().toUpperCase();
         const option = [...select.options].find((item) => item.value.trim().toUpperCase() === normalizedValue);
@@ -191,16 +183,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Función para renderizar la tabla desde el array quoteItems
     const renderTable = () => {
-        quoteItems = quoteItems
-            .map((item, index) => ({ item, index }))
-            .sort((a, b) => {
-                const statusA = String(a.item.estado || '').trim().toUpperCase();
-                const statusB = String(b.item.estado || '').trim().toUpperCase();
-                const orderA = statusOrder[statusA] ?? 5;
-                const orderB = statusOrder[statusB] ?? 5;
-                return orderA - orderB || a.index - b.index;
-            })
-            .map(({ item }) => item);
         itemsTableBody.innerHTML = '';
         updatePartSuggestions(descripInput.value);
 
