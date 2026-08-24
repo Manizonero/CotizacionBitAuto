@@ -150,7 +150,30 @@
         await refresh();
     }
     async function saveMarked() { const blob = await new Promise((resolve) => $('photoCanvas').toBlob(resolve, 'image/jpeg', JPEG_QUALITY)); await save({ ...currentPhoto, blob, marked: true }); $('photoEditor').hidden = true; await refresh(); }
-    function downloadAll() { recordsForPlate().then((records) => { records.forEach((photo, index) => { const link = document.createElement('a'); link.href = URL.createObjectURL(photo.blob); link.download = `${getPlate()}_${String(index + 1).padStart(2, '0')}${photo.marked ? '_MARCADA' : ''}.jpg`; link.click(); setTimeout(() => URL.revokeObjectURL(link.href), 1000); }); if (records.length) { try { const state = JSON.parse(localStorage.getItem('coticarQuoteState') || '{}'); state.photosDownloadedFor = getPlate(); localStorage.setItem('coticarQuoteState', JSON.stringify(state)); setStatus('Fotos descargadas. Ya puedes finalizar la cotizacion.'); } catch (error) { setStatus('Fotos descargadas, pero no se pudo actualizar el estado.'); } } }); }
+    async function downloadAll() {
+        const records = await recordsForPlate();
+        if (!records.length) { setStatus('No hay fotos para descargar.'); return; }
+        setStatus(`Preparando ${records.length} fotos para descargar...`);
+        for (const [index, photo] of records.entries()) {
+            const link = document.createElement('a');
+            const objectUrl = URL.createObjectURL(photo.blob);
+            link.href = objectUrl;
+            link.download = `${getPlate()}_${String(index + 1).padStart(2, '0')}${photo.marked ? '_MARCADA' : ''}.jpg`;
+            link.style.display = 'none';
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            setTimeout(() => URL.revokeObjectURL(objectUrl), 1500);
+            setStatus(`Descargando foto ${index + 1} de ${records.length}...`);
+            await new Promise((resolve) => setTimeout(resolve, 350));
+        }
+        try {
+            const state = JSON.parse(localStorage.getItem('coticarQuoteState') || '{}');
+            state.photosDownloadedFor = getPlate();
+            localStorage.setItem('coticarQuoteState', JSON.stringify(state));
+            setStatus(`${records.length} fotos enviadas a Descargas.`);
+        } catch (error) { setStatus(`${records.length} fotos descargadas.`); }
+    }
 
     async function init() {
         $('plateLabel').textContent = getPlate() ? `PLACA: ${getPlate()}` : 'Sin placa seleccionada';
