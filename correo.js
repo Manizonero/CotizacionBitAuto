@@ -117,7 +117,7 @@
         if (!selected.length) { $('mailStatus').textContent = 'Selecciona al menos un correo.'; return; }
         const recipients = selected.map((contact) => contact.email).join(',');
         const subjectValue = $('subjectInput').value;
-        const bodyValue = body();
+        const bodyValue = $('greetingInput').value.trim() || 'Cordial saludo,';
         const webUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(recipients)}&su=${encodeURIComponent(subjectValue)}`;
         const mobileWebUrl = `${webUrl}&body=${encodeURIComponent(bodyValue)}`;
         const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
