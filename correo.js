@@ -117,14 +117,19 @@
         if (!selected.length) { $('mailStatus').textContent = 'Selecciona al menos un correo.'; return; }
         const recipients = selected.map((contact) => contact.email).join(',');
         const subjectValue = $('subjectInput').value;
+        const bodyValue = body();
         const webUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(recipients)}&su=${encodeURIComponent(subjectValue)}`;
+        const mobileWebUrl = `${webUrl}&body=${encodeURIComponent(bodyValue)}`;
         const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
         let copied = true;
         try { await copyRichBody(); } catch (error) { copied = false; }
         if (isMobile) {
-            const gmailAppUrl = `googlegmail://co?to=${encodeURIComponent(recipients)}&subject=${encodeURIComponent(subjectValue)}`;
+            const composeQuery = `to=${encodeURIComponent(recipients)}&subject=${encodeURIComponent(subjectValue)}&body=${encodeURIComponent(bodyValue)}`;
+            const gmailAppUrl = /Android/i.test(navigator.userAgent)
+                ? `intent://compose?${composeQuery}#Intent;scheme=mailto;package=com.google.android.gm;end`
+                : `googlegmail://co?${composeQuery}`;
             window.location.href = gmailAppUrl;
-            setTimeout(() => { window.location.href = webUrl; }, 1200);
+            setTimeout(() => { window.location.href = mobileWebUrl; }, 1200);
         } else {
             const gmailWindow = window.open(webUrl, '_blank');
             if (!gmailWindow) window.location.href = webUrl;
