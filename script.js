@@ -74,7 +74,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 : ''
         };
         localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-        if (photosLink) photosLink.href = `fotos.html?placa=${encodeURIComponent(placaInput.value.trim().toUpperCase())}`;
+        const placaParam = encodeURIComponent(placaInput.value.trim().toUpperCase());
+        const marcaParam = encodeURIComponent(marcaInput.value.trim());
+        if (photosLink) photosLink.href = `fotos.html?placa=${placaParam}&marca=${marcaParam}`;
     };
 
     const clearState = () => {
@@ -660,133 +662,14 @@ document.addEventListener('DOMContentLoaded', () => {
         descripInput.focus();
     });
 
-    const getRequiredValue = (id) => document.getElementById(id)?.value.trim() || '';
-
-    const getMissingMainFields = () => {
-        const required = ['placa', 'marca', 'linea', 'modelo', 'color', 'tipoCliente'];
-        return required.filter(field => !getRequiredValue(field));
-    };
-
-    const validateCommonDownload = () => {
-        const missing = getMissingMainFields();
-        if (missing.length) {
-            alert(`Faltan datos obligatorios: ${missing.map(f => f.toUpperCase()).join(', ')}`);
-            return false;
-        }
-        return true;
-    };
-
-    const validateSuzukiDownload = () => {
-        if (!validateCommonDownload()) return false;
-        const missingSuzuki = [];
-        if (!getRequiredValue('cilindraje')) missingSuzuki.push('cilindraje');
-        if (!getRequiredValue('vin')) missingSuzuki.push('vin');
-        if (missingSuzuki.length) {
-            alert(`Para Suzuki faltan datos: ${missingSuzuki.map(f => f.toUpperCase()).join(', ')}`);
-            return false;
-        }
-        return true;
-    };
-
-    /* --- Exportar Excel con nombre de placa --- */
-    document.getElementById('cecxel').addEventListener('click', async () => {
-        if (!validateCommonDownload()) return;
-
-        try {
-            const workbook = new ExcelJS.Workbook();
-            const response = await fetch('./template.xlsx');
-            const arrayBuffer = await response.arrayBuffer();
-            await workbook.xlsx.load(arrayBuffer);
-
-            const worksheet = workbook.getWorksheet(1); // Selecciona la primera hoja de la plantilla
-
-            worksheet.getCell('C2').value = document.getElementById('fecha').value || '';
-            worksheet.getCell('C3').value = (document.getElementById('placa').value || '').toUpperCase();
-            worksheet.getCell('E2').value = (document.getElementById('marca').value || '').toUpperCase();
-            worksheet.getCell('E3').value = (document.getElementById('linea').value || '').toUpperCase();
-            worksheet.getCell('C4').value = document.getElementById('modelo')?.value || '';
-            worksheet.getCell('E4').value = (document.getElementById('color')?.value || '').toUpperCase();
-            worksheet.getCell('C5').value = (document.getElementById('tipoCliente')?.value || '').toUpperCase();
-
-
-            let startRow = 8; // Comienza a escribir desde la fila 8 en Excel
-
-            // Ahora iteramos sobre el array quoteItems para llenar el Excel
-            quoteItems.forEach((item) => {
-                worksheet.getCell(`B${startRow}`).value = item.descrip;
-                worksheet.getCell(`F${startRow}`).value = item.cant;
-                worksheet.getCell(`G${startRow}`).value = item.dym;
-                worksheet.getCell(`H${startRow}`).value = item.estado;
-                worksheet.getCell(`I${startRow}`).value = item.pint;
-                worksheet.getCell(`J${startRow}`).value = item.dat;
-
-                startRow++;
-            });
-
-            const placa = document.getElementById('placa').value || 'cotizacion';
-
-            const buffer = await workbook.xlsx.writeBuffer();
-            const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `${placa}.xlsx`.toUpperCase();
-            a.click();
-            URL.revokeObjectURL(url);
-        } catch (error) {
-        }
-    });
-
-    /* --- Exportar Excel de Suzuki --- */
-    document.getElementById('crearex').addEventListener('click', async () => {
-        if (!validateSuzukiDownload()) return;
-
-        try {
-            const workbook = new ExcelJS.Workbook();
-            const response = await fetch('./template2.xlsx');
-            const arrayBuffer = await response.arrayBuffer();
-            const loadedWorkbook = await workbook.xlsx.load(arrayBuffer); // Asegúrate de que esto se resuelva correctamente
-
-            const worksheet = loadedWorkbook.getWorksheet(1); // Usa loadedWorkbook para obtener la hoja
-
-            worksheet.getCell('B6').value = (document.getElementById('placa').value || '').toUpperCase();
-            worksheet.getCell('B3').value = (document.getElementById('linea').value || '').toUpperCase();
-            worksheet.getCell('B2').value = document.getElementById('modelo')?.value || '';
-            worksheet.getCell('B4').value = cilindrajeInput.value || '';
-            worksheet.getCell('B7').value = (document.getElementById('tipoCliente')?.value || '').toUpperCase();
-            worksheet.getCell('B5').value = (vinInput.value || '').toUpperCase();
-
-            let startRow = 14;
-
-            // Ahora iteramos sobre el array quoteItems para llenar el Excel
-            quoteItems.forEach((item) => {
-                worksheet.getCell(`A${startRow}`).value = item.descrip; // Solo descrip aquí
-                worksheet.getCell(`B${startRow}`).value = item.cant;
-
-                startRow++;
-            });
-
-            const placa = document.getElementById('placa').value || 'cotizacion';
-
-            const buffer = await workbook.xlsx.writeBuffer();
-            const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `${placa} Cotizacion Repuestos Suzuki.xlsx`.toUpperCase();
-            a.click();
-            URL.revokeObjectURL(url);
-        } catch (error) {
-        }
-    });
-
     if (newQuoteBtn) {
         newQuoteBtn.addEventListener('click', handleNewQuote);
     }
     finalizeQuoteBtn.addEventListener('click', openFinalizeModal);
     cancelFinalizeBtn.addEventListener('click', () => { finalizeModal.hidden = true; });
     downloadBeforeFinalizeBtn.addEventListener('click', () => {
-        window.location.href = `fotos.html?placa=${encodeURIComponent(placaInput.value.trim().toUpperCase())}`;
+        const marcParam = encodeURIComponent(marcaInput.value.trim());
+        window.location.href = `fotos.html?placa=${encodeURIComponent(placaInput.value.trim().toUpperCase())}&marca=${marcParam}`;
     });
     continueFinalizeBtn.addEventListener('click', () => {
         window.location.href = 'correo.html';

@@ -175,7 +175,68 @@
         } catch (error) { setStatus(`${records.length} fotos descargadas.`); }
     }
 
+    function savedState() {
+        try { return JSON.parse(localStorage.getItem('coticarQuoteState') || '{}'); } catch (error) { return {}; }
+    }
+
+    function getSuzukiMarca() {
+        if (params.get('marca')) return params.get('marca').trim().toUpperCase();
+        return String((savedState().fields || {}).marca || '').trim().toUpperCase();
+    }
+
+    async function generateSuzukiSpreadsheet(state) {
+        const fields = state.fields || {};
+        const missingCommon = ['placa', 'marca', 'linea', 'modelo', 'color', 'tipoCliente'].filter((field) => !String(fields[field] || '').trim());
+        if (missingCommon.length) { alert(`Faltan datos obligatorios: ${missingCommon.map((f) => f.toUpperCase()).join(', ')}`); return; }
+        const missingSuzuki = [];
+        if (!String(fields.cilindraje || '').trim()) missingSuzuki.push('cilindraje');
+        if (!String(fields.vin || '').trim()) missingSuzuki.push('vin');
+        if (missingSuzuki.length) { alert(`Para Suzuki faltan datos: ${missingSuzuki.map((f) => f.toUpperCase()).join(', ')}`); return; }
+        try {
+            const workbook = new ExcelJS.Workbook();
+            const response = await fetch('./template2.xlsx');
+            const arrayBuffer = await response.arrayBuffer();
+            const loadedWorkbook = await workbook.xlsx.load(arrayBuffer);
+            const worksheet = loadedWorkbook.getWorksheet(1);
+            worksheet.getCell('B6').value = (fields.placa || '').toUpperCase();
+            worksheet.getCell('B3').value = (fields.linea || '').toUpperCase();
+            worksheet.getCell('B2').value = fields.modelo || '';
+            worksheet.getCell('B4').value = fields.cilindraje || '';
+            worksheet.getCell('B7').value = (fields.tipoCliente || '').toUpperCase();
+            worksheet.getCell('B5').value = (fields.vin || '').toUpperCase();
+            let startRow = 14;
+            const items = Array.isArray(state.quoteItems) ? state.quoteItems : [];
+            items.forEach((item) => {
+                const estado = String(item.estado || '').trim().toUpperCase();
+                if (estado !== 'CAMBIO') return;
+                worksheet.getCell(`A${startRow}`).value = item.descrip;
+                worksheet.getCell(`B${startRow}`).value = item.cant;
+                startRow++;
+            });
+            const placa = fields.placa || 'cotizacion';
+            const buffer = await workbook.xlsx.writeBuffer();
+            const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${placa} Cotizacion Repuestos Suzuki.xlsx`.toUpperCase();
+            a.click();
+            URL.revokeObjectURL(url);
+        } catch (error) { }
+    }
+
+    function setupSuzukiExport() {
+        const button = $('createSuzukiBtn');
+        if (!button) return;
+        const marca = getSuzukiMarca().toLowerCase();
+        const isEligible = marca === 'suzuki' || marca === 'citroen';
+        button.hidden = !isEligible;
+        if (!isEligible) return;
+        button.addEventListener('click', () => generateSuzukiSpreadsheet(savedState()));
+    }
+
     async function init() {
+        setupSuzukiExport();
         $('plateLabel').textContent = getPlate() ? `PLACA: ${getPlate()}` : 'Sin placa seleccionada';
         try { await openDatabase(); await refresh(); } catch (error) { setStatus('IndexedDB no esta disponible en este navegador.'); return; }
         $('photoInput').addEventListener('change', (event) => processFiles(event, false)); $('detailPhotoInput').addEventListener('change', (event) => processFiles(event, true)); $('downloadPhotosBtn').addEventListener('click', downloadAll); $('cancelDeleteBtn').addEventListener('click', () => { photoPendingDelete = null; $('deleteModal').hidden = true; }); $('confirmDeleteBtn').addEventListener('click', confirmDeletePhoto); $('cancelEditBtn').addEventListener('click', () => { $('photoEditor').hidden = true; }); $('clearDrawingBtn').addEventListener('click', clearDrawing); $('saveMarkedBtn').addEventListener('click', saveMarked);

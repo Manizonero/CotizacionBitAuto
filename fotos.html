@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Fotos de inspeccion</title>
     <link rel="stylesheet" href="fotos.css">
+    <script src="https://cdn.jsdelivr.net/npm/exceljs@4.3.0/dist/exceljs.min.js"></script>
 </head>
 <body>
     <main class="photos-app">
@@ -26,6 +27,7 @@
                 <input id="photoInput" class="visually-hidden" type="file" accept="image/*" capture="environment" multiple>
                 <input id="detailPhotoInput" class="visually-hidden" type="file" accept="image/*" capture="environment">
                 <button id="downloadPhotosBtn" class="action-button" type="button">Descargar fotos</button>
+                <button id="createSuzukiBtn" class="action-button" type="button" hidden>Descargar formato DERCO</button>
             </div>
             <div id="photoGrid" class="photo-grid" aria-live="polite"></div>
         </section>
