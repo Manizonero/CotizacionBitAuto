@@ -45,6 +45,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const continueFinalizeBtn = document.getElementById('continueFinalizeBtn');
 
     const STORAGE_KEY = 'coticarQuoteState';
+    const makeId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 
     // Array para almacenar los ítems de la cotización
     let quoteItems = [];
@@ -69,6 +70,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 nombreCompleto: nombreCompletoInput.value.trim()
             },
             quoteItems,
+            naItems: Array.isArray(currentState.naItems) ? currentState.naItems.filter((id) => quoteItems.some((item) => item.id === id)) : [],
             photosDownloadedFor: currentState.photosDownloadedFor === placaInput.value.trim().toUpperCase()
                 ? currentState.photosDownloadedFor
                 : ''
@@ -96,6 +98,27 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     });
 
+    const photosCountByRepuesto = (plate) => new Promise((resolve, reject) => {
+        if (!plate || !window.indexedDB) { resolve({}); return; }
+        const request = indexedDB.open('TallerDB', 1);
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => {
+            const database = request.result;
+            if (!database.objectStoreNames.contains('inspecciones')) { database.close(); resolve({}); return; }
+            const readRequest = database.transaction('inspecciones', 'readonly').objectStore('inspecciones').index('placaVehiculo').getAll(plate);
+            readRequest.onsuccess = () => {
+                const counts = {};
+                readRequest.result.forEach((record) => {
+                    if (!record.blob?.size || !record.repuestoId) return;
+                    counts[record.repuestoId] = (counts[record.repuestoId] || 0) + 1;
+                });
+                database.close();
+                resolve(counts);
+            };
+            readRequest.onerror = () => { database.close(); reject(readRequest.error); };
+        };
+    });
+
     const openFinalizeModal = async () => {
         const plate = placaInput.value.trim().toUpperCase();
         finalizeModal.hidden = false;
@@ -105,18 +128,32 @@ document.addEventListener('DOMContentLoaded', () => {
             finalizeMessage.textContent = 'Agrega al menos un repuesto antes de finalizar la cotizacion.';
             return;
         }
-        let photoCount = 0;
-        try { photoCount = await countPhotosForPlate(plate); } catch (error) { photoCount = 0; }
-        if (!photoCount) {
-            finalizeMessage.textContent = 'Debes registrar las fotos de esta cotizacion antes de continuar.';
+        let counts = {};
+        try { counts = await photosCountByRepuesto(plate); } catch (error) { counts = {}; }
+        let savedRaw = {};
+        try { savedRaw = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); } catch (error) { savedRaw = {}; }
+        const activeIds = new Set(quoteItems.map((item) => item.id));
+        const naSet = new Set(Array.isArray(savedRaw.naItems) ? savedRaw.naItems.filter((id) => activeIds.has(id)) : []);
+        const pendingParts = quoteItems.filter((item) => !naSet.has(item.id) && !(counts[item.id] > 0));
+        if (pendingParts.length) {
+            finalizeMessage.textContent = `Faltan fotos de repuestos: ${pendingParts.map((p) => p.descrip || 'Sin descripcion').join(', ')}. Tomales una foto o marcalos como N/A en la seccion de fotos.`;
             downloadBeforeFinalizeBtn.textContent = 'Ir a tomar fotos';
             downloadBeforeFinalizeBtn.hidden = false;
             return;
         }
-        if (localStorage.getItem(STORAGE_KEY) && JSON.parse(localStorage.getItem(STORAGE_KEY)).photosDownloadedFor !== plate) {
-            finalizeMessage.textContent = 'Debes descargar todo el registro fotografico antes de finalizar.';
+        const naParts = quoteItems.filter((item) => naSet.has(item.id));
+        const naNote = naParts.length ? `Marcaste como N/A los repuestos: ${naParts.map((p) => p.descrip || 'Sin descripcion').join(', ')}. ` : '';
+        if (localStorage.getItem(STORAGE_KEY) && savedRaw.photosDownloadedFor !== plate) {
+            finalizeMessage.textContent = naNote + 'Debes descargar todo el registro fotografico antes de finalizar.';
             downloadBeforeFinalizeBtn.textContent = 'Ir a descargar fotos';
             downloadBeforeFinalizeBtn.hidden = false;
+            return;
+        }
+        if (naParts.length) {
+            finalizeMessage.textContent = naNote + 'Revisa si quieres tomarles una foto antes de finalizar o continuar tal como estan.';
+            downloadBeforeFinalizeBtn.textContent = 'Ir a tomar foto';
+            downloadBeforeFinalizeBtn.hidden = false;
+            continueFinalizeBtn.hidden = false;
             return;
         }
         finalizeMessage.textContent = 'Repuestos y fotos verificados. Puedes preparar el correo.';
@@ -282,7 +319,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 nombreCompletoInput.value = state.fields.nombreCompleto || '';
             }
 
-            quoteItems = Array.isArray(state.quoteItems) ? state.quoteItems : [];
+            quoteItems = (Array.isArray(state.quoteItems) ? state.quoteItems : []).map((item) => (item && item.id ? item : { ...item, id: makeId() }));
             renderTable();
         } catch (error) {
             console.warn('No se pudo cargar el estado guardado:', error);
@@ -290,6 +327,7 @@ document.addEventListener('DOMContentLoaded', () => {
             isLoading = false;
         }
 
+        saveState();
         updateUserDisplay();
         updateQuoteCard();
         if (!nombreCompletoInput.value.trim()) {
@@ -635,6 +673,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const newItem = {
+            id: editingItem ? editingItem.id : makeId(),
             descrip,
             cant,
             dym,
@@ -681,7 +720,7 @@ document.addEventListener('DOMContentLoaded', () => {
     window.CoticarVoice = {
         register(item) {
             if (!item || !item.descrip) return false;
-            quoteItems.push(item);
+            quoteItems.push({ ...item, id: item.id || makeId() });
             renderTable();
             saveState();
             return true;

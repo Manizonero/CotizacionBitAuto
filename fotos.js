@@ -31,6 +31,37 @@
             return [...new Set((Array.isArray(state?.quoteItems) ? state.quoteItems : []).map((item) => item.descrip?.trim()).filter(Boolean))];
         } catch (error) { return []; }
     }
+    function makeId() {
+        return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    }
+    function savedRepuestos() {
+        let state = {};
+        try { state = JSON.parse(localStorage.getItem('coticarQuoteState') || '{}'); } catch (error) { state = {}; }
+        let items = Array.isArray(state.quoteItems) ? state.quoteItems : [];
+        let changed = false;
+        items = items.map((item) => {
+            if (!item || item.id) return item;
+            changed = true;
+            return { ...item, id: makeId() };
+        });
+        if (changed) {
+            try { state.quoteItems = items; localStorage.setItem('coticarQuoteState', JSON.stringify(state)); } catch (error) {}
+        }
+        return items;
+    }
+    function savedNaIds() {
+        try {
+            const state = JSON.parse(localStorage.getItem('coticarQuoteState') || '{}');
+            return new Set(Array.isArray(state.naItems) ? state.naItems : []);
+        } catch (error) { return new Set(); }
+    }
+    function saveNaIds(idSet) {
+        try {
+            const state = JSON.parse(localStorage.getItem('coticarQuoteState') || '{}');
+            state.naItems = Array.isArray(idSet) ? idSet : [...idSet];
+            localStorage.setItem('coticarQuoteState', JSON.stringify(state));
+        } catch (error) {}
+    }
     function updateEditorPartSuggestions(filter = '') {
         const menu = $('editorPartsMenu');
         if (!menu) return;
@@ -82,19 +113,148 @@
             image.src = url;
         });
     }
+    function renderPhotoCards(grid, photoList) {
+        photoList.forEach((photo) => {
+            const card = document.createElement('div');
+            card.className = 'photo-card';
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = `photo-thumb${photo.marked ? ' photo-thumb-marked' : ''}`;
+            const image = document.createElement('img');
+            image.src = URL.createObjectURL(photo.blob);
+            image.alt = photo.marked ? 'Foto marcada' : 'Foto de inspeccion';
+            button.appendChild(image);
+            button.addEventListener('click', () => openEditor(photo));
+            const deleteButton = document.createElement('button');
+            deleteButton.type = 'button';
+            deleteButton.className = 'delete-photo-button';
+            deleteButton.innerHTML = '&#128465;';
+            deleteButton.title = 'Eliminar foto';
+            deleteButton.setAttribute('aria-label', 'Eliminar foto');
+            deleteButton.addEventListener('click', (event) => { event.stopPropagation(); deletePhoto(photo); });
+            card.appendChild(button);
+            card.appendChild(deleteButton);
+            grid.appendChild(card);
+        });
+    }
+    function buildRepuestoCard(item) {
+        const isNa = savedNaIds().has(item.id);
+        const card = document.createElement('div');
+        card.className = 'repuesto-card' + (isNa ? ' repuesto-card-na' : '');
+        if (isNa) {
+            const label = document.createElement('span');
+            label.className = 'repuesto-na-name';
+            label.textContent = item.descrip || item.id;
+            const tag = document.createElement('span');
+            tag.className = 'repuesto-na-tag';
+            tag.textContent = 'N/A';
+            card.appendChild(label);
+            card.appendChild(tag);
+            card.title = 'Pulsa para quitar el N/A';
+            card.setAttribute('role', 'button');
+            card.tabIndex = 0;
+            card.addEventListener('click', () => toggleNa(item));
+            card.addEventListener('keydown', (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggleNa(item); } });
+            return card;
+        }
+        const id = item.id;
+        const repPhotos = photos.filter((photo) => String(photo.repuestoId) === String(id));
+        const name = document.createElement('div');
+        name.className = 'repuesto-name';
+        name.textContent = item.descrip || item.id;
+        name.title = item.descrip || '';
+        const media = document.createElement('div');
+        media.className = 'repuesto-media';
+        if (repPhotos.length) renderPhotoCards(media, repPhotos);
+        else {
+            const empty = document.createElement('div');
+            empty.className = 'repuesto-empty';
+            empty.textContent = 'Sin foto';
+            media.appendChild(empty);
+        }
+        const counter = document.createElement('div');
+        counter.className = 'repuesto-count';
+        counter.textContent = `${repPhotos.length} ${repPhotos.length === 1 ? 'foto' : 'fotos'}`;
+        const actions = document.createElement('div');
+        actions.className = 'repuesto-actions';
+        const inputId = 'repPhoto_' + String(id);
+        const input = document.createElement('input');
+        input.id = inputId;
+        input.className = 'visually-hidden';
+        input.type = 'file';
+        input.accept = 'image/*';
+        input.setAttribute('capture', 'environment');
+        input.multiple = true;
+        input.addEventListener('change', (event) => processFiles(event, true, item));
+        const cameraBtn = document.createElement('button');
+        cameraBtn.type = 'button';
+        cameraBtn.className = 'repuesto-camera-btn';
+        cameraBtn.innerHTML = '&#128247;';
+        cameraBtn.title = 'Tomar foto de ' + name.textContent;
+        cameraBtn.setAttribute('aria-label', 'Tomar foto de ' + name.textContent);
+        cameraBtn.addEventListener('click', () => input.click());
+        const naBtn = document.createElement('button');
+        naBtn.type = 'button';
+        naBtn.className = 'repuesto-na-btn';
+        naBtn.textContent = 'N/A';
+        naBtn.title = 'Marcar como no aplica foto';
+        naBtn.setAttribute('aria-pressed', String(savedNaIds().has(id)));
+        naBtn.addEventListener('click', () => toggleNa(item));
+        naBtn.classList.toggle('is-na', savedNaIds().has(id));
+        actions.appendChild(cameraBtn);
+        actions.appendChild(input);
+        actions.appendChild(naBtn);
+        card.appendChild(name);
+        card.appendChild(media);
+        card.appendChild(counter);
+        card.appendChild(actions);
+        return card;
+    }
+    function renderRepuestos() {
+        const container = $('repuestosList');
+        const naWrapper = $('repuestosNa');
+        const naList = $('repuestosNaList');
+        if (!container) return;
+        container.innerHTML = '';
+        naList.innerHTML = '';
+        const repuestos = savedRepuestos();
+        const naIds = savedNaIds();
+        let naCount = 0;
+        repuestos.forEach((item) => {
+            const card = buildRepuestoCard(item);
+            if (naIds.has(item.id)) { naCount++; naList.appendChild(card); }
+            else container.appendChild(card);
+        });
+        naWrapper.hidden = naCount === 0;
+        if (!repuestos.length) {
+            const empty = document.createElement('p');
+            empty.className = 'panel-heading-caption';
+            empty.textContent = 'No hay repuestos registrados. Vuelve a Datos y agrega los repuestos.';
+            container.appendChild(empty);
+        }
+    }
+    function toggleNa(item) {
+        const naIds = savedNaIds();
+        if (naIds.has(item.id)) naIds.delete(item.id);
+        else naIds.add(item.id);
+        saveNaIds(naIds);
+        render();
+    }
     function render() {
         const grid = $('photoGrid'); grid.innerHTML = '';
-        photos.forEach((photo) => { const card = document.createElement('div'); card.className = 'photo-card'; const button = document.createElement('button'); button.type = 'button'; button.className = `photo-thumb${photo.marked ? ' photo-thumb-marked' : ''}`; const image = document.createElement('img'); image.src = URL.createObjectURL(photo.blob); image.alt = photo.marked ? 'Foto marcada' : 'Foto de inspeccion'; button.appendChild(image); button.addEventListener('click', () => openEditor(photo)); const deleteButton = document.createElement('button'); deleteButton.type = 'button'; deleteButton.className = 'delete-photo-button'; deleteButton.innerHTML = '&#128465;'; deleteButton.title = 'Eliminar foto'; deleteButton.setAttribute('aria-label', 'Eliminar foto'); deleteButton.addEventListener('click', (event) => { event.stopPropagation(); deletePhoto(photo); }); card.appendChild(button); card.appendChild(deleteButton); grid.appendChild(card); });
+        const generalPhotos = photos.filter((photo) => !photo.repuestoId);
+        renderPhotoCards(grid, generalPhotos);
         $('photoCount').textContent = `${photos.length} ${photos.length === 1 ? 'foto' : 'fotos'}`;
+        renderRepuestos();
     }
     async function refresh() {
         photos = getPlate() ? await recordsForPlate() : [];
         render();
         setStatus(getPlate() ? `${photos.length} fotos guardadas localmente para ${getPlate()}.` : 'Vuelve a la cotizacion y registra una placa.');
     }
-    async function processFiles(event, openDetail) {
+    async function processFiles(event, openDetail, repuesto) {
         if (!getPlate()) { setStatus('No hay placa activa.'); return; }
-        try { for (const file of event.target.files) await save({ placaVehiculo: getPlate(), blob: await compress(file), marked: false, createdAt: Date.now() }); await refresh(); if (openDetail && photos.length) openEditor(photos[photos.length - 1]); } catch (error) { setStatus(`No se pudo guardar la foto: ${error.message}`); }
+        try { for (const file of event.target.files) await save({ placaVehiculo: getPlate(), blob: await compress(file), marked: false, createdAt: Date.now(), repuestoId: repuesto && repuesto.id ? String(repuesto.id) : undefined, repuesto: repuesto && repuesto.descrip ? repuesto.descrip : undefined }); await refresh(); if (openDetail && photos.length) openEditor(photos[photos.length - 1]); } catch (error) { setStatus(`No se pudo guardar la foto: ${error.message}`); }
         event.target.value = '';
     }
     function pointFromEvent(event) { const canvas = $('photoCanvas'); const rect = canvas.getBoundingClientRect(); return { x: (event.clientX - rect.left) * canvas.width / rect.width, y: (event.clientY - rect.top) * canvas.height / rect.height }; }

@@ -19,17 +19,29 @@
 
         <section class="photo-panel" aria-labelledby="capture-title">
             <div class="panel-heading">
-                <div><h2 id="capture-title">Captura local</h2><p id="photoStatus" aria-live="polite">Preparando almacenamiento...</p></div>
+                <div><h2 id="capture-title">Fotos generales</h2><p id="photoStatus" aria-live="polite">Preparando almacenamiento...</p></div>
                 <strong id="photoCount">0 fotos</strong>
             </div>
+            <div id="photoGrid" class="photo-grid" aria-live="polite"></div>
             <div class="capture-actions">
-                <label class="action-button primary" for="photoInput">Tomar foto</label>
+                <label class="action-button primary" for="photoInput" title="Tomar una foto general">📷 Tomar foto</label>
                 <input id="photoInput" class="visually-hidden" type="file" accept="image/*" capture="environment" multiple>
                 <input id="detailPhotoInput" class="visually-hidden" type="file" accept="image/*" capture="environment">
                 <button id="downloadPhotosBtn" class="action-button" type="button">Descargar fotos</button>
                 <button id="createSuzukiBtn" class="action-button" type="button" hidden>Descargar formato DERCO</button>
             </div>
-            <div id="photoGrid" class="photo-grid" aria-live="polite"></div>
+        </section>
+
+        <section class="photo-panel repuestos-panel" aria-labelledby="repuestos-title">
+            <div class="panel-heading">
+                <div><h2 id="repuestos-title">Fotos por repuesto</h2><p class="panel-heading-caption">Cada repuesto tiene su camara y un boton N/A si no aplica foto.</p></div>
+            </div>
+            <div id="repuestosList" class="repuestos-list" aria-live="polite"></div>
+            <div id="repuestosNa" class="repuestos-na" aria-live="polite" hidden>
+                <h3>REPUESTOS SIN FOTO (N/A)</h3>
+                <p class="panel-heading-caption">Estos se te volveran a mostrar al finalizar para que decidas si les tomas alguna foto.</p>
+                <div id="repuestosNaList" class="repuestos-list"></div>
+            </div>
         </section>
         <div class="photo-navigation">
             <a class="nav-button data-link" href="index.html">Datos</a>
