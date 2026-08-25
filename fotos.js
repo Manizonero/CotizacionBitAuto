@@ -185,7 +185,7 @@
         input.accept = 'image/*';
         input.setAttribute('capture', 'environment');
         input.multiple = true;
-        input.addEventListener('change', (event) => processFiles(event, true, item));
+        input.addEventListener('change', (event) => processFiles(event, false, item));
         const cameraBtn = document.createElement('button');
         cameraBtn.type = 'button';
         cameraBtn.className = 'repuesto-camera-btn';
@@ -265,7 +265,7 @@
             if (annotation.type === 'circle') context.arc(annotation.cx, annotation.cy, annotation.radius, 0, Math.PI * 2);
             else if (annotation.type === 'arrow') { context.moveTo(annotation.x1, annotation.y1); context.lineTo(annotation.x2, annotation.y2); const angle = Math.atan2(annotation.y2 - annotation.y1, annotation.x2 - annotation.x1); const size = 28; context.moveTo(annotation.x2, annotation.y2); context.lineTo(annotation.x2 - size * Math.cos(angle - Math.PI / 6), annotation.y2 - size * Math.sin(angle - Math.PI / 6)); context.moveTo(annotation.x2, annotation.y2); context.lineTo(annotation.x2 - size * Math.cos(angle + Math.PI / 6), annotation.y2 - size * Math.sin(angle + Math.PI / 6)); }
             context.stroke(); context.restore();
-            if (annotation.type === 'text') { context.save(); const padding = 18; const fontSize = Math.max(32, Math.min(64, Math.max($('photoCanvas').width, $('photoCanvas').height) / 20)); context.font = `700 ${fontSize}px Oxanium, sans-serif`; const textWidth = context.measureText(annotation.text).width; const x = $('photoCanvas').width - textWidth - padding * 2; const y = $('photoCanvas').height - fontSize - padding * 2; context.fillStyle = '#fff'; context.fillRect(Math.max(0, x), Math.max(0, y), Math.min(textWidth + padding * 2, $('photoCanvas').width), fontSize + padding * 2); context.fillStyle = '#111827'; context.textBaseline = 'top'; context.fillText(annotation.text, Math.max(padding, x + padding), Math.max(padding, y + padding)); context.restore(); }
+            if (annotation.type === 'text') { context.save(); const padding = 12; const fontSize = Math.max(18, Math.min(38, Math.max($('photoCanvas').width, $('photoCanvas').height) / 22)); context.font = `700 ${fontSize}px Oxanium, sans-serif`; const textWidth = context.measureText(annotation.text).width; const x = $('photoCanvas').width - textWidth - padding * 2; const y = $('photoCanvas').height - fontSize - padding * 2; context.fillStyle = '#fff'; context.fillRect(Math.max(0, x), Math.max(0, y), Math.min(textWidth + padding * 2, $('photoCanvas').width), fontSize + padding * 2); context.fillStyle = '#111827'; context.textBaseline = 'top'; context.fillText(annotation.text, Math.max(padding, x + padding), Math.max(padding, y + padding)); context.restore(); }
         });
     }
     function annotationAt(point) {
@@ -292,7 +292,9 @@
         }
         annotationMode = 'auto';
     }
-    function openEditor(photo) { currentPhoto = photo; annotations = []; sourceImage = new Image(); sourceImage.onload = () => { const canvas = $('photoCanvas'); canvas.width = sourceImage.width; canvas.height = sourceImage.height; redraw(); }; sourceImage.src = URL.createObjectURL(photo.blob); $('photoEditor').hidden = false; }
+    function openEditor(photo) { currentPhoto = photo; annotations = []; sourceImage = new Image(); sourceImage.onload = () => { const canvas = $('photoCanvas'); canvas.width = sourceImage.width; canvas.height = sourceImage.height; redraw(); }; sourceImage.src = URL.createObjectURL(photo.blob); $('photoEditor').hidden = false; if (history.pushState && !editorHistoryGuardAttached) { history.pushState(null, ''); window.addEventListener('popstate', closeEditorOnBack); editorHistoryGuardAttached = true; } }
+    let editorHistoryGuardAttached = false;
+    function closeEditorOnBack(event) { if ($('photoEditor') && !$('photoEditor').hidden) { event.preventDefault(); $('photoEditor').hidden = true; if (editorHistoryGuardAttached) { history.pushState(null, ''); } } }
     function clearDrawing() { annotations = []; if (sourceImage) redraw(); }
     function deleteRecord(id) {
         return new Promise((resolve, reject) => { const request = store('readwrite').delete(id); request.onsuccess = resolve; request.onerror = () => reject(request.error); });
