@@ -16,9 +16,10 @@
     let points = [];
     let annotations = [];
     let movingAnnotation;
-    let moveOffset;
+        let moveOffset;
     let annotationMode = 'auto';
     let photoPendingDelete;
+    let repuestoToDelete;
     const annotationStrokeWidth = () => Math.max(16, Math.min(38, Math.max($('photoCanvas').width, $('photoCanvas').height) / 105));
 
     function getPlate() {
@@ -125,15 +126,7 @@
             image.alt = photo.marked ? 'Foto marcada' : 'Foto de inspeccion';
             button.appendChild(image);
             button.addEventListener('click', () => openEditor(photo));
-            const deleteButton = document.createElement('button');
-            deleteButton.type = 'button';
-            deleteButton.className = 'delete-photo-button';
-            deleteButton.innerHTML = '&#128465;';
-            deleteButton.title = 'Eliminar foto';
-            deleteButton.setAttribute('aria-label', 'Eliminar foto');
-            deleteButton.addEventListener('click', (event) => { event.stopPropagation(); deletePhoto(photo); });
             card.appendChild(button);
-            card.appendChild(deleteButton);
             grid.appendChild(card);
         });
     }
@@ -207,7 +200,7 @@
         trashBtn.title = 'Eliminar fotos de ' + name.textContent;
         trashBtn.setAttribute('aria-label', 'Eliminar fotos de ' + name.textContent);
         trashBtn.disabled = !repPhotos.length;
-        trashBtn.addEventListener('click', (event) => { event.stopPropagation(); deleteRepuestoPhotos(item); });
+        trashBtn.addEventListener('click', (event) => { event.stopPropagation(); repuestoToDelete = item; photoPendingDelete = null; $('deleteModal').hidden = false; });
         icons.appendChild(cameraBtn);
         icons.appendChild(naBtn);
         icons.appendChild(trashBtn);
@@ -221,21 +214,7 @@
         card.appendChild(counter);
         return card;
     }
-    async function deleteRepuestoPhotos(item) {
-        const label = item.descrip || item.id;
-        if (!confirm(`¿Eliminar todas las fotos del repuesto "${label}"?`)) return;
-        const plate = getPlate();
-        if (!plate) return;
-        let allRecords = [];
-        try { allRecords = await recordsForPlate(); } catch (error) { setStatus(`No se pudieron cargar las fotos: ${error.message}`); return; }
-        const toRemove = allRecords.filter((photo) => String(photo.repuestoId) === String(item.id));
-        if (!toRemove.length) return;
-        for (const photo of toRemove) {
-            try { await deleteRecord(photo.id); } catch (error) { setStatus(`No se pudo eliminar una foto: ${error.message}`); }
-        }
-        await refresh();
-    }
-    function renderRepuestos() {
+        function renderRepuestos() {
         const container = $('repuestosList');
         const naWrapper = $('repuestosNa');
         const naList = $('repuestosNaList');
@@ -330,10 +309,24 @@
         $('deleteModal').hidden = false;
     }
     async function confirmDeletePhoto() {
-        if (!photoPendingDelete) return;
-        await deleteRecord(photoPendingDelete.id);
+        const photo = photoPendingDelete;
+        const repuesto = repuestoToDelete;
         photoPendingDelete = null;
+        repuestoToDelete = null;
         $('deleteModal').hidden = true;
+        if (repuesto) {
+            let allRecords = [];
+            try { allRecords = await recordsForPlate(); } catch (error) { setStatus(`No se pudieron cargar las fotos: ${error.message}`); return; }
+            const toRemove = allRecords.filter((photo) => String(photo.repuestoId) === String(repuesto.id));
+            if (toRemove.length) setStatus(`Eliminando ${toRemove.length} foto(s)...`);
+            for (const photo of toRemove) {
+                try { await deleteRecord(photo.id); } catch (error) { setStatus('No se pudo eliminar una foto: ' + error.message); }
+            }
+            await refresh();
+            return;
+        }
+        if (!photo) return;
+        await deleteRecord(photo.id);
         await refresh();
     }
     async function saveMarked() { const blob = await new Promise((resolve) => $('photoCanvas').toBlob(resolve, 'image/jpeg', JPEG_QUALITY)); await save({ ...currentPhoto, blob, marked: true }); $('photoEditor').hidden = true; await refresh(); }
@@ -426,7 +419,7 @@
         setupSuzukiExport();
         $('plateLabel').textContent = getPlate() ? `PLACA: ${getPlate()}` : 'Sin placa seleccionada';
         try { await openDatabase(); await refresh(); } catch (error) { setStatus('IndexedDB no esta disponible en este navegador.'); return; }
-        $('photoInput').addEventListener('change', (event) => processFiles(event, false)); $('detailPhotoInput').addEventListener('change', (event) => processFiles(event, true)); $('downloadPhotosBtn').addEventListener('click', downloadAll); $('cancelDeleteBtn').addEventListener('click', () => { photoPendingDelete = null; $('deleteModal').hidden = true; }); $('confirmDeleteBtn').addEventListener('click', confirmDeletePhoto); $('cancelEditBtn').addEventListener('click', () => { $('photoEditor').hidden = true; }); $('clearDrawingBtn').addEventListener('click', clearDrawing); $('saveMarkedBtn').addEventListener('click', saveMarked);
+        $('photoInput').addEventListener('change', (event) => processFiles(event, false)); $('detailPhotoInput').addEventListener('change', (event) => processFiles(event, true)); $('downloadPhotosBtn').addEventListener('click', downloadAll); $('cancelDeleteBtn').addEventListener('click', () => { photoPendingDelete = null; repuestoToDelete = null; $('deleteModal').hidden = true; }); $('confirmDeleteBtn').addEventListener('click', confirmDeletePhoto); $('cancelEditBtn').addEventListener('click', () => { $('photoEditor').hidden = true; }); $('clearDrawingBtn').addEventListener('click', clearDrawing); $('saveMarkedBtn').addEventListener('click', saveMarked);
         const commandInput = $('editorCommandInput'); const partsMenu = $('editorPartsMenu'); commandInput.addEventListener('click', () => { updateEditorPartSuggestions(''); partsMenu.hidden = !partsMenu.children.length; }); const canvas = $('photoCanvas'); canvas.addEventListener('pointerdown', startDraw); canvas.addEventListener('pointermove', continueDraw); canvas.addEventListener('pointerup', finishDraw); canvas.addEventListener('pointercancel', finishDraw); const context = canvas.getContext('2d'); context.strokeStyle = '#ef2222'; context.lineWidth = annotationStrokeWidth(); context.lineCap = 'round';
     }
     window.descargarFotosMasivas = downloadAll;
