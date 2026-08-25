@@ -154,7 +154,7 @@
             card.setAttribute('role', 'button');
             card.tabIndex = 0;
             card.addEventListener('click', () => toggleNa(item));
-            card.addEventListener('keydown', (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggleNa(item); } });
+                        card.addEventListener('keydown', (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggleNa(item); } });
             return card;
         }
         const id = item.id;
@@ -163,6 +163,8 @@
         name.className = 'repuesto-name';
         name.textContent = item.descrip || item.id;
         name.title = item.descrip || '';
+        const row = document.createElement('div');
+        row.className = 'repuesto-row';
         const media = document.createElement('div');
         media.className = 'repuesto-media';
         if (repPhotos.length) renderPhotoCards(media, repPhotos);
@@ -172,11 +174,8 @@
             empty.textContent = 'Sin foto';
             media.appendChild(empty);
         }
-        const counter = document.createElement('div');
-        counter.className = 'repuesto-count';
-        counter.textContent = `${repPhotos.length} ${repPhotos.length === 1 ? 'foto' : 'fotos'}`;
-        const actions = document.createElement('div');
-        actions.className = 'repuesto-actions';
+        const icons = document.createElement('div');
+        icons.className = 'repuesto-icons';
         const inputId = 'repPhoto_' + String(id);
         const input = document.createElement('input');
         input.id = inputId;
@@ -188,27 +187,53 @@
         input.addEventListener('change', (event) => processFiles(event, false, item));
         const cameraBtn = document.createElement('button');
         cameraBtn.type = 'button';
-        cameraBtn.className = 'repuesto-camera-btn';
+        cameraBtn.className = 'repuesto-icon-btn repuesto-camera-btn';
         cameraBtn.innerHTML = '&#128247;';
         cameraBtn.title = 'Tomar foto de ' + name.textContent;
         cameraBtn.setAttribute('aria-label', 'Tomar foto de ' + name.textContent);
         cameraBtn.addEventListener('click', () => input.click());
         const naBtn = document.createElement('button');
         naBtn.type = 'button';
-        naBtn.className = 'repuesto-na-btn';
+        naBtn.className = 'repuesto-icon-btn repuesto-na-btn';
         naBtn.textContent = 'N/A';
         naBtn.title = 'Marcar como no aplica foto';
         naBtn.setAttribute('aria-pressed', String(savedNaIds().has(id)));
-        naBtn.addEventListener('click', () => toggleNa(item));
         naBtn.classList.toggle('is-na', savedNaIds().has(id));
-        actions.appendChild(cameraBtn);
-        actions.appendChild(input);
-        actions.appendChild(naBtn);
+        naBtn.addEventListener('click', () => toggleNa(item));
+        const trashBtn = document.createElement('button');
+        trashBtn.type = 'button';
+        trashBtn.className = 'repuesto-icon-btn repuesto-delete-btn';
+        trashBtn.innerHTML = '&#128465;';
+        trashBtn.title = 'Eliminar fotos de ' + name.textContent;
+        trashBtn.setAttribute('aria-label', 'Eliminar fotos de ' + name.textContent);
+        trashBtn.disabled = !repPhotos.length;
+        trashBtn.addEventListener('click', (event) => { event.stopPropagation(); deleteRepuestoPhotos(item); });
+        icons.appendChild(cameraBtn);
+        icons.appendChild(naBtn);
+        icons.appendChild(trashBtn);
+        row.appendChild(media);
+        row.appendChild(icons);
+        const counter = document.createElement('div');
+        counter.className = 'repuesto-count';
+        counter.textContent = `${repPhotos.length} ${repPhotos.length === 1 ? 'foto' : 'fotos'}`;
         card.appendChild(name);
-        card.appendChild(media);
+        card.appendChild(row);
         card.appendChild(counter);
-        card.appendChild(actions);
         return card;
+    }
+    async function deleteRepuestoPhotos(item) {
+        const label = item.descrip || item.id;
+        if (!confirm(`¿Eliminar todas las fotos del repuesto "${label}"?`)) return;
+        const plate = getPlate();
+        if (!plate) return;
+        let allRecords = [];
+        try { allRecords = await recordsForPlate(); } catch (error) { setStatus(`No se pudieron cargar las fotos: ${error.message}`); return; }
+        const toRemove = allRecords.filter((photo) => String(photo.repuestoId) === String(item.id));
+        if (!toRemove.length) return;
+        for (const photo of toRemove) {
+            try { await deleteRecord(photo.id); } catch (error) { setStatus(`No se pudo eliminar una foto: ${error.message}`); }
+        }
+        await refresh();
     }
     function renderRepuestos() {
         const container = $('repuestosList');
