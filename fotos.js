@@ -86,7 +86,6 @@
         const canvas = $('photoCanvas');
         annotations.push({ type: 'text', text: value.trim(), x: canvas.width / 2, y: canvas.height / 2 });
         redraw();
-        $('editorVoiceStatus').textContent = `Daño "${value}" agregado. Arrástralo a la posición deseada.`;
         const s = $('damageSelect');
         if (s) s.value = '';
     }
@@ -95,8 +94,7 @@
         const canvas = $('photoCanvas');
         annotations.push({ type: 'repuesto', text: value.trim(), x: canvas.width / 2, y: canvas.height / 2 });
         redraw();
-        $('editorVoiceStatus').textContent = `Repuesto "${value}" agregado. Arrástralo a la posición deseada.`;
-        const inp = $('repuestoEditInput');
+        const inp = $('repuestoSelect');
         if (inp) inp.value = '';
     }
     function setStatus(text) { $('photoStatus').textContent = text; }
@@ -480,7 +478,7 @@
         $('plateLabel').textContent = getPlate() ? `PLACA: ${getPlate()}` : 'Sin placa seleccionada';
         try { await openDatabase(); await refresh(); } catch (error) { setStatus('IndexedDB no esta disponible en este navegador.'); return; }
         $('photoInput').addEventListener('change', (event) => processFiles(event, false)); $('detailPhotoInput').addEventListener('change', (event) => processFiles(event, true)); $('downloadPhotosBtn').addEventListener('click', downloadAll); $('cancelDeleteBtn').addEventListener('click', () => { photoPendingDelete = null; repuestoToDelete = null; $('deleteModal').hidden = true; }); $('confirmDeleteBtn').addEventListener('click', confirmDeletePhoto); $('cancelEditBtn').addEventListener('click', () => { $('photoEditor').hidden = true; }); $('clearDrawingBtn').addEventListener('click', undoLastStroke); $('saveMarkedBtn').addEventListener('click', saveMarked);
-        const damageSelect = $('damageSelect'); if (damageSelect) damageSelect.addEventListener('change', () => { if (damageSelect.value) addTextAnnotation(damageSelect.value); }); const repuestoList = $('repuestoEditList'); if (repuestoList) { savedPartDescriptions().forEach((description) => { const opt = document.createElement('option'); opt.value = description; repuestoList.appendChild(opt); }); } const repuestoEdit = $('repuestoEditInput'); if (repuestoEdit) repuestoEdit.addEventListener('change', () => { const v = repuestoEdit.value.trim(); if (v) addRepuestoAnnotation(v); }); const canvas = $('photoCanvas'); canvas.addEventListener('pointerdown', startDraw); canvas.addEventListener('pointermove', continueDraw); canvas.addEventListener('pointerup', finishDraw); canvas.addEventListener('pointercancel', finishDraw); const context = canvas.getContext('2d'); context.strokeStyle = '#ef2222'; context.lineWidth = annotationStrokeWidth(); context.lineCap = 'round';
+        const damageSelect = $('damageSelect'); if (damageSelect) damageSelect.addEventListener('change', () => { if (damageSelect.value) addTextAnnotation(damageSelect.value); }); const repuestoSelect = $('repuestoSelect'); if (repuestoSelect) { savedPartDescriptions().forEach((description) => { const opt = document.createElement('option'); opt.value = description; opt.textContent = description; repuestoSelect.appendChild(opt); }); repuestoSelect.addEventListener('change', () => { if (repuestoSelect.value) addRepuestoAnnotation(repuestoSelect.value); }); } const canvas = $('photoCanvas'); canvas.addEventListener('pointerdown', startDraw); canvas.addEventListener('pointermove', continueDraw); canvas.addEventListener('pointerup', finishDraw); canvas.addEventListener('pointercancel', finishDraw); const context = canvas.getContext('2d'); context.strokeStyle = '#ef2222'; context.lineWidth = annotationStrokeWidth(); context.lineCap = 'round';
     }
     window.descargarFotosMasivas = downloadAll;
     document.addEventListener('DOMContentLoaded', init);
