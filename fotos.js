@@ -20,7 +20,7 @@
     let annotationMode = 'auto';
     let photoPendingDelete;
     let repuestoToDelete;
-    const annotationStrokeWidth = () => Math.max(16, Math.min(38, Math.max($('photoCanvas').width, $('photoCanvas').height) / 105));
+    const annotationStrokeWidth = () => Math.max(12, Math.min(32, Math.max($('photoCanvas').width, $('photoCanvas').height) / 140));
 
     function getPlate() {
         if (params.get('placa')) return params.get('placa').trim().toUpperCase();
@@ -83,11 +83,12 @@
     }
     function addTextAnnotation(value) {
         if (!value.trim()) return;
-        annotations.push({ type: 'text', text: value.trim() });
+        const canvas = $('photoCanvas');
+        annotations.push({ type: 'text', text: value.trim(), x: canvas.width / 2, y: canvas.height / 2 });
         redraw();
-        $('editorVoiceStatus').textContent = 'Repuesto agregado en la esquina inferior derecha de la foto.';
-        $('editorCommandInput').value = '';
-        $('editorPartsMenu').hidden = true;
+        $('editorVoiceStatus').textContent = `Daño "${value}" agregado. Arrástralo a la posición deseada.`;
+        const s = $('damageSelect');
+        if (s) s.value = '';
     }
     function setStatus(text) { $('photoStatus').textContent = text; }
     function openDatabase() {
@@ -105,16 +106,42 @@
     function recordsForPlate() {
         return new Promise((resolve, reject) => { const request = store('readonly').index('placaVehiculo').getAll(getPlate()); request.onsuccess = () => resolve(request.result.filter((record) => record.blob?.size).sort((a, b) => a.createdAt - b.createdAt)); request.onerror = () => reject(request.error); });
     }
-    function compress(file) {
+    function compress(file, label) {
         return new Promise((resolve, reject) => {
             const image = new Image();
             const url = URL.createObjectURL(file);
-            image.onload = () => { const scale = Math.min(1, MAX_WIDTH / image.width, MAX_HEIGHT / image.height); const canvas = document.createElement('canvas'); canvas.width = Math.max(1, Math.round(image.width * scale)); canvas.height = Math.max(1, Math.round(image.height * scale)); canvas.getContext('2d').drawImage(image, 0, 0, canvas.width, canvas.height); URL.revokeObjectURL(url); canvas.toBlob(resolve, 'image/jpeg', JPEG_QUALITY); };
+            image.onload = () => {
+                const scale = Math.min(1, MAX_WIDTH / image.width, MAX_HEIGHT / image.height);
+                const canvas = document.createElement('canvas');
+                canvas.width = Math.max(1, Math.round(image.width * scale));
+                canvas.height = Math.max(1, Math.round(image.height * scale));
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+                URL.revokeObjectURL(url);
+                if (label) {
+                    const fontSize = Math.max(12, Math.floor(canvas.width / 55));
+                    ctx.font = `700 ${fontSize}px Oxanium, sans-serif`;
+                    ctx.textBaseline = 'alphabetic';
+                    const textWidth = ctx.measureText(label).width;
+                    const pad = Math.max(4, Math.floor(canvas.width * 0.012));
+                    const lineHeight = Math.ceil(fontSize * 1.35);
+                    const boxX = canvas.width - textWidth - pad * 2;
+                    const boxW = textWidth + pad * 2;
+                    const boxH = lineHeight + pad * 2;
+                    const boxY = canvas.height - boxH;
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+                    ctx.fillRect(boxX, boxY, boxW, boxH);
+                    ctx.fillStyle = '#111827';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(label, boxX + pad, boxY + pad + lineHeight / 2);
+                }
+                canvas.toBlob(resolve, 'image/jpeg', JPEG_QUALITY);
+            };
             image.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Imagen no valida')); };
             image.src = url;
         });
     }
-    function renderPhotoCards(grid, photoList) {
+    function renderPhotoCards(grid, photoList, showDelete) {
         photoList.forEach((photo) => {
             const card = document.createElement('div');
             card.className = 'photo-card';
@@ -127,6 +154,16 @@
             button.appendChild(image);
             button.addEventListener('click', () => openEditor(photo));
             card.appendChild(button);
+            if (showDelete) {
+                const delBtn = document.createElement('button');
+                delBtn.type = 'button';
+                delBtn.className = 'photo-delete-btn';
+                delBtn.innerHTML = '&#128465;';
+                delBtn.title = 'Eliminar foto';
+                delBtn.setAttribute('aria-label', 'Eliminar foto');
+                delBtn.addEventListener('click', (event) => { event.stopPropagation(); deletePhoto(photo); });
+                card.appendChild(delBtn);
+            }
             grid.appendChild(card);
         });
     }
@@ -247,7 +284,7 @@
     function render() {
         const grid = $('photoGrid'); grid.innerHTML = '';
         const generalPhotos = photos.filter((photo) => !photo.repuestoId);
-        renderPhotoCards(grid, generalPhotos);
+        renderPhotoCards(grid, generalPhotos, true);
         $('photoCount').textContent = `${photos.length} ${photos.length === 1 ? 'foto' : 'fotos'}`;
         renderRepuestos();
     }
@@ -258,7 +295,7 @@
     }
     async function processFiles(event, openDetail, repuesto) {
         if (!getPlate()) { setStatus('No hay placa activa.'); return; }
-        try { for (const file of event.target.files) await save({ placaVehiculo: getPlate(), blob: await compress(file), marked: false, createdAt: Date.now(), repuestoId: repuesto && repuesto.id ? String(repuesto.id) : undefined, repuesto: repuesto && repuesto.descrip ? repuesto.descrip : undefined }); await refresh(); if (openDetail && photos.length) openEditor(photos[photos.length - 1]); } catch (error) { setStatus(`No se pudo guardar la foto: ${error.message}`); }
+        try { for (const file of event.target.files) await save({ placaVehiculo: getPlate(), blob: await compress(file, repuesto && repuesto.descrip), marked: false, createdAt: Date.now(), repuestoId: repuesto && repuesto.id ? String(repuesto.id) : undefined, repuesto: repuesto && repuesto.descrip ? repuesto.descrip : undefined }); await refresh(); if (openDetail && photos.length) openEditor(photos[photos.length - 1]); } catch (error) { setStatus(`No se pudo guardar la foto: ${error.message}`); }
         event.target.value = '';
     }
     function pointFromEvent(event) { const canvas = $('photoCanvas'); const rect = canvas.getBoundingClientRect(); return { x: (event.clientX - rect.left) * canvas.width / rect.width, y: (event.clientY - rect.top) * canvas.height / rect.height }; }
@@ -269,37 +306,51 @@
             if (annotation.type === 'circle') context.arc(annotation.cx, annotation.cy, annotation.radius, 0, Math.PI * 2);
             else if (annotation.type === 'arrow') { context.moveTo(annotation.x1, annotation.y1); context.lineTo(annotation.x2, annotation.y2); const angle = Math.atan2(annotation.y2 - annotation.y1, annotation.x2 - annotation.x1); const size = 28; context.moveTo(annotation.x2, annotation.y2); context.lineTo(annotation.x2 - size * Math.cos(angle - Math.PI / 6), annotation.y2 - size * Math.sin(angle - Math.PI / 6)); context.moveTo(annotation.x2, annotation.y2); context.lineTo(annotation.x2 - size * Math.cos(angle + Math.PI / 6), annotation.y2 - size * Math.sin(angle + Math.PI / 6)); }
             context.stroke(); context.restore();
-            if (annotation.type === 'text') { context.save(); const padding = 12; const fontSize = Math.max(18, Math.min(38, Math.max($('photoCanvas').width, $('photoCanvas').height) / 22)); context.font = `700 ${fontSize}px Oxanium, sans-serif`; const textWidth = context.measureText(annotation.text).width; const x = $('photoCanvas').width - textWidth - padding * 2; const y = $('photoCanvas').height - fontSize - padding * 2; context.fillStyle = '#fff'; context.fillRect(Math.max(0, x), Math.max(0, y), Math.min(textWidth + padding * 2, $('photoCanvas').width), fontSize + padding * 2); context.fillStyle = '#111827'; context.textBaseline = 'top'; context.fillText(annotation.text, Math.max(padding, x + padding), Math.max(padding, y + padding)); context.restore(); }
+            if (annotation.type === 'text') { context.save(); const padding = 10; const fontSize = Math.max(12, Math.min(30, Math.max($('photoCanvas').width, $('photoCanvas').height) / 34)); context.font = `700 ${fontSize}px Oxanium, sans-serif`; const textWidth = context.measureText(annotation.text).width; const boxW = textWidth + padding * 2; const boxH = fontSize + padding * 2; const cx = annotation.x; const cy = annotation.y; const x = Math.max(0, Math.min($('photoCanvas').width - boxW, cx - boxW / 2)); const y = Math.max(0, Math.min($('photoCanvas').height - boxH, cy - boxH / 2)); context.fillStyle = '#fff'; context.fillRect(x, y, boxW, boxH); context.fillStyle = '#111827'; context.textBaseline = 'middle'; context.textAlign = 'left'; context.fillText(annotation.text, x + padding, y + boxH / 2); context.strokeStyle = '#ef2222'; context.lineWidth = 3; context.strokeRect(x, y, boxW, boxH); context.restore(); }
         });
     }
     function annotationAt(point) {
-        for (let index = annotations.length - 1; index >= 0; index -= 1) { const annotation = annotations[index]; const hit = annotation.type === 'circle' ? Math.abs(distance(point, { x: annotation.cx, y: annotation.cy }) - annotation.radius) < 35 : distanceToSegment(point, annotation) < 35; if (hit) return annotation; }
+        for (let index = annotations.length - 1; index >= 0; index -= 1) {
+            const annotation = annotations[index];
+            let hit = false;
+            if (annotation.type === 'circle') hit = Math.abs(distance(point, { x: annotation.cx, y: annotation.cy }) - annotation.radius) < 35;
+            else if (annotation.type === 'arrow') hit = distanceToSegment(point, annotation) < 35;
+            else if (annotation.type === 'text') {
+                const context = $('photoCanvas').getContext('2d');
+                const fontSize = Math.max(12, Math.min(30, Math.max($('photoCanvas').width, $('photoCanvas').height) / 34));
+                context.font = `700 ${fontSize}px Oxanium, sans-serif`;
+                const pad = 10;
+                const w = context.measureText(annotation.text).width + pad * 2 + 12;
+                const h = fontSize + pad * 2 + 12;
+                hit = point.x >= annotation.x - w / 2 && point.x <= annotation.x + w / 2 && point.y >= annotation.y - h / 2 && point.y <= annotation.y + h / 2;
+            }
+            if (hit) return annotation;
+        }
         return null;
     }
     function distanceToSegment(point, annotation) { const dx = annotation.x2 - annotation.x1; const dy = annotation.y2 - annotation.y1; const length = dx * dx + dy * dy || 1; const ratio = Math.max(0, Math.min(1, ((point.x - annotation.x1) * dx + (point.y - annotation.y1) * dy) / length)); return distance(point, { x: annotation.x1 + ratio * dx, y: annotation.y1 + ratio * dy }); }
     function redraw() { const context = $('photoCanvas').getContext('2d'); context.clearRect(0, 0, $('photoCanvas').width, $('photoCanvas').height); context.drawImage(sourceImage, 0, 0); drawAnnotations(); }
-    function startDraw(event) { const point = pointFromEvent(event); movingAnnotation = annotationAt(point); if (movingAnnotation) { moveOffset = movingAnnotation.type === 'circle' ? { x: point.x - movingAnnotation.cx, y: point.y - movingAnnotation.cy } : { x: point.x - movingAnnotation.x1, y: point.y - movingAnnotation.y1 }; event.preventDefault(); return; } drawing = true; points = [point]; const context = $('photoCanvas').getContext('2d'); context.beginPath(); context.moveTo(point.x, point.y); event.preventDefault(); }
-    function continueDraw(event) { const point = pointFromEvent(event); if (movingAnnotation) { if (movingAnnotation.type === 'circle') { movingAnnotation.cx = point.x - moveOffset.x; movingAnnotation.cy = point.y - moveOffset.y; } else { const dx = point.x - moveOffset.x - movingAnnotation.x1; const dy = point.y - moveOffset.y - movingAnnotation.y1; movingAnnotation.x1 += dx; movingAnnotation.y2 += dx; movingAnnotation.y1 += dy; movingAnnotation.y2 += dy; } redraw(); event.preventDefault(); return; } if (!drawing) return; points.push(point); const context = $('photoCanvas').getContext('2d'); context.lineTo(point.x, point.y); context.stroke(); event.preventDefault(); }
+    function startDraw(event) { const point = pointFromEvent(event); movingAnnotation = annotationAt(point); if (movingAnnotation) { if (movingAnnotation.type === 'circle') moveOffset = { x: point.x - movingAnnotation.cx, y: point.y - movingAnnotation.cy }; else if (movingAnnotation.type === 'text') moveOffset = { x: point.x - movingAnnotation.x, y: point.y - movingAnnotation.y }; else moveOffset = { x: point.x - movingAnnotation.x1, y: point.y - movingAnnotation.y1 }; event.preventDefault(); return; } drawing = true; points = [point]; const context = $('photoCanvas').getContext('2d'); context.beginPath(); context.moveTo(point.x, point.y); event.preventDefault(); }
+    function continueDraw(event) { const point = pointFromEvent(event); if (movingAnnotation) { if (movingAnnotation.type === 'circle') { movingAnnotation.cx = point.x - moveOffset.x; movingAnnotation.cy = point.y - moveOffset.y; } else if (movingAnnotation.type === 'text') { movingAnnotation.x = point.x - moveOffset.x; movingAnnotation.y = point.y - moveOffset.y; } else { const dx = point.x - moveOffset.x - movingAnnotation.x1; const dy = point.y - moveOffset.y - movingAnnotation.y1; movingAnnotation.x1 += dx; movingAnnotation.y2 += dx; movingAnnotation.y1 += dy; movingAnnotation.y2 += dy; } redraw(); event.preventDefault(); return; } if (!drawing) return; points.push(point); const context = $('photoCanvas').getContext('2d'); context.lineTo(point.x, point.y); context.stroke(); event.preventDefault(); }
     function finishDraw() { movingAnnotation = null; moveOffset = null; if (!drawing) return; drawing = false; recognizeGesture(points); redraw(); points = []; }
     function distance(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
     function recognizeGesture(path) {
-        if (path.length < 8) return;
-        const first = path[0]; const last = path[path.length - 1]; const pathLength = path.slice(1).reduce((total, point, index) => total + distance(path[index], point), 0); const xs = path.map((point) => point.x); const ys = path.map((point) => point.y); const width = Math.max(...xs) - Math.min(...xs); const height = Math.max(...ys) - Math.min(...ys); const size = Math.max(width, height); const endDistance = distance(first, last);
-        const closed = endDistance < size * 0.42 && width > 28 && height > 28 && pathLength > size * 1.3;
-        const straightness = pathLength ? endDistance / pathLength : 0;
-        const linear = size > 35 && pathLength > size * 1.05 && straightness > 0.55;
+        if (path.length < 2) return;
+        const first = path[0]; const last = path[path.length - 1];
+        const xs = path.map((p) => p.x); const ys = path.map((p) => p.y);
+        const width = Math.max(...xs) - Math.min(...xs); const height = Math.max(...ys) - Math.min(...ys); const size = Math.max(width, height);
+        if (size < 20) return;
+        const endDistance = distance(first, last);
+        const closed = endDistance < size * 0.4 && width > 20 && height > 20;
         if (annotationMode === 'circle' || (annotationMode === 'auto' && closed)) {
             annotations.push({ type: 'circle', cx: (Math.min(...xs) + Math.max(...xs)) / 2, cy: (Math.min(...ys) + Math.max(...ys)) / 2, radius: Math.min(width, height) / 2 }); annotationMode = 'auto'; redraw(); return;
         }
-        if (annotationMode === 'arrow' || (annotationMode === 'auto' && linear)) {
-            annotations.push({ type: 'arrow', x1: first.x, y1: first.y, x2: last.x, y2: last.y }); redraw();
-        }
-        annotationMode = 'auto';
+        annotations.push({ type: 'arrow', x1: first.x, y1: first.y, x2: last.x, y2: last.y }); annotationMode = 'auto'; redraw();
     }
     function openEditor(photo) { currentPhoto = photo; annotations = []; sourceImage = new Image(); sourceImage.onload = () => { const canvas = $('photoCanvas'); canvas.width = sourceImage.width; canvas.height = sourceImage.height; redraw(); }; sourceImage.src = URL.createObjectURL(photo.blob); $('photoEditor').hidden = false; if (history.pushState && !editorHistoryGuardAttached) { history.pushState(null, ''); window.addEventListener('popstate', closeEditorOnBack); editorHistoryGuardAttached = true; } }
     let editorHistoryGuardAttached = false;
     function closeEditorOnBack(event) { if ($('photoEditor') && !$('photoEditor').hidden) { event.preventDefault(); $('photoEditor').hidden = true; if (editorHistoryGuardAttached) { history.pushState(null, ''); } } }
-    function clearDrawing() { annotations = []; if (sourceImage) redraw(); }
+    function undoLastStroke() { if (!annotations.length) { if (sourceImage) redraw(); return; } annotations.pop(); if (sourceImage) redraw(); }
     function deleteRecord(id) {
         return new Promise((resolve, reject) => { const request = store('readwrite').delete(id); request.onsuccess = resolve; request.onerror = () => reject(request.error); });
     }
@@ -419,8 +470,8 @@
         setupSuzukiExport();
         $('plateLabel').textContent = getPlate() ? `PLACA: ${getPlate()}` : 'Sin placa seleccionada';
         try { await openDatabase(); await refresh(); } catch (error) { setStatus('IndexedDB no esta disponible en este navegador.'); return; }
-        $('photoInput').addEventListener('change', (event) => processFiles(event, false)); $('detailPhotoInput').addEventListener('change', (event) => processFiles(event, true)); $('downloadPhotosBtn').addEventListener('click', downloadAll); $('cancelDeleteBtn').addEventListener('click', () => { photoPendingDelete = null; repuestoToDelete = null; $('deleteModal').hidden = true; }); $('confirmDeleteBtn').addEventListener('click', confirmDeletePhoto); $('cancelEditBtn').addEventListener('click', () => { $('photoEditor').hidden = true; }); $('clearDrawingBtn').addEventListener('click', clearDrawing); $('saveMarkedBtn').addEventListener('click', saveMarked);
-        const commandInput = $('editorCommandInput'); const partsMenu = $('editorPartsMenu'); commandInput.addEventListener('click', () => { updateEditorPartSuggestions(''); partsMenu.hidden = !partsMenu.children.length; }); const canvas = $('photoCanvas'); canvas.addEventListener('pointerdown', startDraw); canvas.addEventListener('pointermove', continueDraw); canvas.addEventListener('pointerup', finishDraw); canvas.addEventListener('pointercancel', finishDraw); const context = canvas.getContext('2d'); context.strokeStyle = '#ef2222'; context.lineWidth = annotationStrokeWidth(); context.lineCap = 'round';
+        $('photoInput').addEventListener('change', (event) => processFiles(event, false)); $('detailPhotoInput').addEventListener('change', (event) => processFiles(event, true)); $('downloadPhotosBtn').addEventListener('click', downloadAll); $('cancelDeleteBtn').addEventListener('click', () => { photoPendingDelete = null; repuestoToDelete = null; $('deleteModal').hidden = true; }); $('confirmDeleteBtn').addEventListener('click', confirmDeletePhoto); $('cancelEditBtn').addEventListener('click', () => { $('photoEditor').hidden = true; }); $('clearDrawingBtn').addEventListener('click', undoLastStroke); $('saveMarkedBtn').addEventListener('click', saveMarked);
+        const damageSelect = $('damageSelect'); if (damageSelect) damageSelect.addEventListener('change', () => { if (damageSelect.value) addTextAnnotation(damageSelect.value); }); const canvas = $('photoCanvas'); canvas.addEventListener('pointerdown', startDraw); canvas.addEventListener('pointermove', continueDraw); canvas.addEventListener('pointerup', finishDraw); canvas.addEventListener('pointercancel', finishDraw); const context = canvas.getContext('2d'); context.strokeStyle = '#ef2222'; context.lineWidth = annotationStrokeWidth(); context.lineCap = 'round';
     }
     window.descargarFotosMasivas = downloadAll;
     document.addEventListener('DOMContentLoaded', init);

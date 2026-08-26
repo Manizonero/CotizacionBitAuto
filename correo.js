@@ -77,7 +77,7 @@
         table.append(header, values);
         $('mailVehicleTableWrap').replaceChildren(table);
     };
-    const updatePreview = () => { $('subjectInput').value = settings.subject || subject(); renderVehiclePreview(); renderItemsTable(); };
+    const updatePreview = () => { $('subjectInput').value = subject(); renderVehiclePreview(); renderItemsTable(); };
     const addContact = (event) => { event.preventDefault(); const name = $('contactName').value.trim(); const email = $('contactEmail').value.trim().toLowerCase(); const duplicate = contacts.some((contact, index) => contact.email === email && index !== editingContactIndex); if (duplicate) { $('contactStatus').textContent = 'Ese correo ya esta registrado.'; return; } if (editingContactIndex === null) contacts.push({ name, email, selected: true }); else { contacts[editingContactIndex] = { ...contacts[editingContactIndex], name, email }; } editingContactIndex = null; saveContacts(); event.target.reset(); $('contactForm').hidden = true; $('contactStatus').textContent = 'Correo guardado.'; renderContacts(); };
     $('contactForm').addEventListener('submit', addContact);
     $('contactsList').addEventListener('change', (event) => { if (!event.target.matches('input[type="checkbox"]')) return; contacts[Number(event.target.dataset.index)].selected = event.target.checked; saveContacts(); renderContacts(); });
@@ -89,7 +89,7 @@
     $('cancelContactBtn').addEventListener('click', () => { editingContactIndex = null; $('contactForm').reset(); $('contactForm').hidden = true; });
     $('greetingInput').value = settings.greeting || '';
     $('greetingInput').addEventListener('input', () => { settings.greeting = $('greetingInput').value; saveSettings(); updatePreview(); });
-    $('subjectInput').addEventListener('input', () => { settings.subject = $('subjectInput').value; saveSettings(); });
+    $('subjectInput').addEventListener('input', () => { $('subjectInput').value = subject(); });
     const copyRichBody = async () => {
         const html = richBody();
         if (navigator.clipboard?.write && window.ClipboardItem) {
@@ -117,7 +117,7 @@
         if (!selected.length) { $('mailStatus').textContent = 'Selecciona al menos un correo.'; return; }
         const recipients = selected.map((contact) => contact.email).join(',');
         const subjectValue = $('subjectInput').value;
-        const bodyValue = $('greetingInput').value.trim() || 'Cordial saludo,';
+        const bodyValue = '';
         const webUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(recipients)}&su=${encodeURIComponent(subjectValue)}`;
         const mobileWebUrl = `${webUrl}&body=${encodeURIComponent(bodyValue)}`;
         const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);

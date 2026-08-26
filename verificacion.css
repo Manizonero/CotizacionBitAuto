@@ -1,0 +1,20 @@
+@import url('https://fonts.googleapis.com/css2?family=Oxanium:wght@400;600;700&display=swap');
+* { box-sizing: border-box; }
+body { margin: 0; min-height: 100vh; color: #17233f; background: #f2f6fa; font-family: "Oxanium", sans-serif; }
+.top-nav { position: sticky; top: 0; z-index: 5; display: flex; justify-content: center; gap: 12px; padding: 9px 4px; background: #fff; border-bottom: 1px solid #d4ddef; }.top-nav .nav-ico { display: inline-grid; place-items: center; width: 46px; height: 46px; border-radius: 12px; color: #315ddc; background: #eef4ff; text-decoration: none; font-size: 21px; line-height: 1; transition: background .15s ease, transform .1s ease; -webkit-tap-highlight-color: transparent; }.top-nav .nav-ico:hover { background: #dde9ff; transform: translateY(-1px); }
+.verif-app { width: min(720px, 94%); margin: 0 auto; padding: 28px 0 48px; }
+.verif-header { margin-bottom: 22px; }.verif-header h1 { margin: 0 0 5px; font-size: clamp(1.7rem, 5vw, 2.5rem); }.eyebrow { margin: 0 0 5px; color: #315ddc; font-size: 11px; font-weight: 700; letter-spacing: 1px; }.muted { margin: 0; color: #60708d; font-size: .88rem; }
+.verif-panel { margin-bottom: 20px; padding: 20px; background: #fff; border: 1px solid #cad4e9; border-radius: 14px; box-shadow: 0 8px 24px rgba(50, 78, 130, .08); }
+.panel-heading { display: flex; align-items: center; justify-content: space-between; gap: 15px; margin-bottom: 6px; }.panel-heading h2 { margin: 0 0 4px; font-size: 1.2rem; }
+.count-badge { padding: 8px 12px; border-radius: 20px; color: #315ddc; background: #edf2ff; white-space: nowrap; }
+.panel-caption { margin: 6px 0 0; color: #60708d; font-size: .82rem; }
+.verif-list { display: grid; gap: 8px; margin-top: 14px; }
+.verif-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 13px 14px; border: 1px solid #dce4f3; border-radius: 12px; background: #f7fafc; }
+.verif-item label { display: flex; align-items: center; gap: 12px; flex: 1; cursor: pointer; font-weight: 600; font-size: .93rem; color: #17233f; -webkit-tap-highlight-color: transparent; }
+.verif-item .verif-check { width: 22px; height: 22px; flex-shrink: 0; accent-color: #315ddc; cursor: pointer; }
+.verif-item .verif-done { flex-shrink: 0; padding: 4px 10px; border-radius: 8px; color: #17643a; background: #e5f6ec; font-size: .78rem; font-weight: 700; }
+.verif-item.checked { border-color: #bfe6cf; background: #effaf3; }
+.verif-item.checked label span { text-decoration: line-through; color: #60708d; }
+.verif-actions { display: flex; justify-content: center; padding: 8px 4px 0; }
+.action-button { padding: 12px 22px; border: 0; border-radius: 9px; color: #fff; background: #315ddc; cursor: pointer; font: 600 .95rem "Oxanium", sans-serif; -webkit-tap-highlight-color: transparent; }.action-button:hover { background: #2a4fc0; }.action-button:active { transform: scale(.98); }
+@media (max-width: 600px) { .verif-app { width: 94%; padding-top: 18px; }.verif-panel { padding: 15px; } }
