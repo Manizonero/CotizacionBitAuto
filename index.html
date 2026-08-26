@@ -9,7 +9,12 @@
 
 </head>
 <body>
-    <header class="site-header">
+        <nav class="top-nav" aria-label="Navegacion principal">
+            <a href="index.html" class="nav-ico" aria-label="Datos" title="Datos"><span aria-hidden="true">📋</span></a>
+            <a id="photosLink" href="fotos.html" class="nav-ico" aria-label="Fotos" title="Fotos"><span aria-hidden="true">📷</span></a>
+            <a href="correo.html" class="nav-ico" aria-label="Correo" title="Correo"><span aria-hidden="true">✉</span></a>
+        </nav>
+        <header class="site-header">
         <div class="header-left">
             <img src="assets/app_icon_512.png" alt="App icon" class="app-icon">
             <div class="app-name">BitAuto</div>
@@ -116,8 +121,6 @@
 
     <div class="final-action-row">
         <button id="newQuoteBtn" class="secondary-button">Nueva cotización</button>
-        <a id="photosLink" class="secondary-button nav-button photos-link" href="fotos.html">Fotos</a>
-        <button id="finalizeQuoteBtn" class="secondary-button finalize-button" type="button">Finalizar</button>
     </div>
 
     <div id="userModal" class="user-modal" role="dialog" aria-modal="true" aria-labelledby="user-title" hidden>
@@ -192,18 +195,6 @@
             <div class="new-quote-warning-actions">
                 <button id="cancelDeleteItemBtn" class="secondary-button" type="button">Cancelar</button>
                 <button id="confirmDeleteItemBtn" class="secondary-button warning-button" type="button">Eliminar</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="finalizeModal" class="user-modal" role="dialog" aria-modal="true" aria-labelledby="finalize-title" hidden>
-        <div class="user-modal-content finalize-modal-content">
-            <h2 id="finalize-title">FINALIZAR COTIZACION</h2>
-            <p id="finalizeMessage">Verificaremos los repuestos y el registro fotografico antes de continuar.</p>
-            <div class="new-quote-warning-actions">
-                <button id="cancelFinalizeBtn" class="secondary-button" type="button">Cancelar</button>
-                <button id="downloadBeforeFinalizeBtn" class="secondary-button warning-button" type="button" hidden>Ir a descargar fotos</button>
-                <button id="continueFinalizeBtn" class="secondary-button" type="button">Continuar al correo</button>
             </div>
         </div>
     </div>

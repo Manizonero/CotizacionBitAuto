@@ -8,7 +8,12 @@
     <script src="https://cdn.jsdelivr.net/npm/exceljs@4.3.0/dist/exceljs.min.js"></script>
 </head>
 <body>
-    <main class="photos-app">
+        <nav class="top-nav" aria-label="Navegacion principal">
+            <a href="index.html" class="nav-ico" aria-label="Datos" title="Datos"><span aria-hidden="true">📋</span></a>
+            <a href="fotos.html" class="nav-ico" aria-label="Fotos" title="Fotos"><span aria-hidden="true">📷</span></a>
+            <a href="correo.html" class="nav-ico" aria-label="Correo" title="Correo"><span aria-hidden="true">✉</span></a>
+        </nav>
+        <main class="photos-app">
         <header class="photos-header">
             <div>
                 <p class="eyebrow">BITAUTO / INSPECCION</p>
@@ -27,8 +32,6 @@
                 <label class="action-button primary" for="photoInput" title="Tomar una foto general">📷 Tomar foto</label>
                 <input id="photoInput" class="visually-hidden" type="file" accept="image/*" capture="environment" multiple>
                 <input id="detailPhotoInput" class="visually-hidden" type="file" accept="image/*" capture="environment">
-                <button id="downloadPhotosBtn" class="action-button" type="button">Descargar fotos</button>
-                <button id="createSuzukiBtn" class="action-button" type="button" hidden>Descargar formato DERCO</button>
             </div>
         </section>
 
@@ -39,13 +42,13 @@
             <div id="repuestosList" class="repuestos-list" aria-live="polite"></div>
             <div id="repuestosNa" class="repuestos-na" aria-live="polite" hidden>
                 <h3>REPUESTOS SIN FOTO (N/A)</h3>
-                <p class="panel-heading-caption">Estos se te volveran a mostrar al finalizar para que decidas si les tomas alguna foto.</p>
+                <p class="panel-heading-caption">Estos repuestos sin foto se mostraran aqui para decidir si les tomas alguna foto.</p>
                 <div id="repuestosNaList" class="repuestos-list"></div>
             </div>
-        </section>
-        <div class="photo-navigation">
-            <a class="nav-button data-link" href="index.html">Datos</a>
-            <a class="nav-button" href="correo.html">Finalizar</a>
+                </section>
+        <div class="download-actions">
+            <button id="downloadPhotosBtn" class="action-button" type="button">Descargar fotos</button>
+            <button id="createSuzukiBtn" class="action-button" type="button" hidden>Descargar formato DERCO</button>
         </div>
     </main>
 

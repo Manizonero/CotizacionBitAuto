@@ -6,6 +6,7 @@ body { margin: 0; min-height: 100vh; color: #17233f; background: #fff; font-fami
 .back-link { color: #315ddc; font-weight: 700; text-decoration: none; padding-top: 7px; }
 .nav-button { display: inline-block; padding: 12px 22px; border: 2px solid #4b859c; border-radius: 16px; color: #24314c; background: #fff; cursor: pointer; font: 600 16px "Oxanium", sans-serif; line-height: normal; text-decoration: none; transition: transform 0.2s ease, opacity 0.2s ease, background-color 0.2s ease; }
 .data-link { margin-top: 4px; }.nav-button:hover { transform: translateY(-1px); opacity: 0.95; background: #f1f8fb; }
+.top-nav { position: sticky; top: 0; z-index: 5; display: flex; justify-content: center; gap: 12px; padding: 9px 4px; background: #fff; border-bottom: 1px solid #d4ddef; }.top-nav .nav-ico { display: inline-grid; place-items: center; width: 46px; height: 46px; border-radius: 12px; color: #315ddc; background: #eef4ff; text-decoration: none; font-size: 21px; line-height: 1; transition: background .15s ease, transform .1s ease; -webkit-tap-highlight-color: transparent; }.top-nav .nav-ico:hover { background: #dde9ff; transform: translateY(-1px); }
 .photo-navigation { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; align-items: stretch; }.photo-navigation .nav-button { width: 100%; min-width: 0; height: 48px; padding: 0; display: flex; align-items: center; justify-content: center; text-align: center; white-space: nowrap; font-size: 15px; box-sizing: border-box; }
 .eyebrow { margin: 0 0 5px; color: #315ddc; font-size: 11px; font-weight: 700; letter-spacing: 1px; }
 h1, h2, p { margin-top: 0; } h1 { margin-bottom: 4px; font-size: clamp(1.7rem, 5vw, 2.5rem); } h2 { margin-bottom: 4px; font-size: 1.2rem; }
@@ -15,6 +16,8 @@ h1, h2, p { margin-top: 0; } h1 { margin-bottom: 4px; font-size: clamp(1.7rem, 5
 .panel-heading strong { padding: 8px 12px; border-radius: 20px; color: #315ddc; background: #edf2ff; white-space: nowrap; }
 .capture-actions, .editor-actions { display: flex; flex-wrap: wrap; gap: 10px; }
 .capture-actions { margin-top: 16px; }
+.download-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; padding: 20px 4px 8px; }
+.download-actions .action-button { flex: 1 1 170px; text-align: center; min-height: 44px; }
 .panel-heading-caption { margin: 4px 0 0; color: #60708d; font-size: .82rem; }
 .action-button, .editor-actions button, .editor-header button { padding: 11px 15px; border: 0; border-radius: 8px; color: #17233f; background: #edf2fa; cursor: pointer; font: 600 .9rem "Oxanium", sans-serif; }
 .action-button.primary, .editor-actions .primary { color: #fff; background: #315ddc; }.action-button.detail { color: #17643a; background: #e5f6ec; }

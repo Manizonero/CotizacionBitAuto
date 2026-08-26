@@ -575,6 +575,7 @@ label {
     justify-content: center;
     text-align: center;
 }
+.top-nav { position: sticky; top: 0; z-index: 5; display: flex; justify-content: center; gap: 12px; padding: 9px 4px; background: #fff; border-bottom: 1px solid #d4ddef; }.top-nav .nav-ico { display: inline-grid; place-items: center; width: 46px; height: 46px; border-radius: 12px; color: #315ddc; background: #eef4ff; text-decoration: none; font-size: 21px; line-height: 1; transition: background .15s ease, transform .1s ease; -webkit-tap-highlight-color: transparent; }.top-nav .nav-ico:hover { background: #dde9ff; transform: translateY(-1px); }
 .finalize-button { grid-column: 1 / -1; width: auto; min-height: 48px; padding-left: 48px; padding-right: 48px; justify-self: center; align-self: center; }
 
 /* Título de la lista de ítems */
