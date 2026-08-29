@@ -37,9 +37,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const deleteItemModal = document.getElementById('deleteItemModal');
     const cancelDeleteItemBtn = document.getElementById('cancelDeleteItemBtn');
     const confirmDeleteItemBtn = document.getElementById('confirmDeleteItemBtn');
+    const alertModal = document.getElementById('alertModal');
+    const alertMessage = document.getElementById('alertMessage');
+    const closeAlertBtn = document.getElementById('closeAlertBtn');
 
-    const STORAGE_KEY = 'coticarQuoteState';
-    const makeId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    const showAlert = (message) => {
+        alertMessage.textContent = message;
+        alertModal.hidden = false;
+    };
+    if (closeAlertBtn) closeAlertBtn.addEventListener('click', () => { alertModal.hidden = true; });
+
+    // Gestión del estado centralizada mediante AppStorage (storage.js)
+    const storage = window.AppStorage;
 
     // Array para almacenar los ítems de la cotización
     let quoteItems = [];
@@ -49,7 +58,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const saveState = () => {
         if (isLoading) return;
         
-        const currentState = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+        const currentState = storage.getState();
         const state = {
             fields: {
                 fecha: fechaInput.value.trim(),
@@ -69,14 +78,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 ? currentState.photosDownloadedFor
                 : ''
         };
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        storage.saveState(state);
         const placaParam = encodeURIComponent(placaInput.value.trim().toUpperCase());
         const marcaParam = encodeURIComponent(marcaInput.value.trim());
         if (photosLink) photosLink.href = `fotos.html?placa=${placaParam}&marca=${marcaParam}`;
     };
 
     const clearState = () => {
-        localStorage.removeItem(STORAGE_KEY);
+        storage.clearState();
     };
 
     const updateUserDisplay = () => {
@@ -215,8 +224,10 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const loadState = () => {
-        const savedState = localStorage.getItem(STORAGE_KEY);
-        if (!savedState) {
+        const state = storage.getState();
+        const hasData = state && (state.fields.nombreCompleto || state.fields.placa || (state.quoteItems && state.quoteItems.length > 0));
+
+        if (!hasData) {
             updateUserDisplay();
             openUserModal();
             return;
@@ -224,7 +235,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         try {
             isLoading = true;
-            const state = JSON.parse(savedState);
             if (state.fields) {
                 fechaInput.value = state.fields.fecha || '';
                 placaInput.value = state.fields.placa || '';
@@ -238,7 +248,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 nombreCompletoInput.value = state.fields.nombreCompleto || '';
             }
 
-            quoteItems = (Array.isArray(state.quoteItems) ? state.quoteItems : []).map((item) => (item && item.id ? item : { ...item, id: makeId() }));
+            quoteItems = (Array.isArray(state.quoteItems) ? state.quoteItems : []).map((item) => (item && item.id ? item : { ...item, id: storage.makeId() }));
             renderTable();
         } catch (error) {
             console.warn('No se pudo cargar el estado guardado:', error);
@@ -313,6 +323,8 @@ document.addEventListener('DOMContentLoaded', () => {
         saveState();
         updateQuoteCard();
         closeQuoteModal();
+        // Redirigir a Generales después de guardar datos del vehículo
+        window.location.href = 'generales.html';
     });
 
     const resetFormFields = () => {
@@ -335,31 +347,22 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const handleNewQuote = () => {
+        const state = storage.getState();
+        if (!state.photosDownloaded) {
+            showAlert('No puedes iniciar una nueva cotización sin antes haber descargado las imágenes.');
+            return;
+        }
+        if (!state.emailOpened) {
+            showAlert('No puedes iniciar una nueva cotización sin antes haber enviado el correo (abierto Gmail).');
+            return;
+        }
         newQuoteWarningModal.hidden = false;
     };
-
-    const deletePhotosForPlate = (plate) => new Promise((resolve, reject) => {
-        if (!plate || !window.indexedDB) { resolve(); return; }
-        const request = indexedDB.open('TallerDB', 1);
-        request.onerror = () => reject(request.error);
-        request.onsuccess = () => {
-            const database = request.result;
-            if (!database.objectStoreNames.contains('inspecciones')) { resolve(); return; }
-            const transaction = database.transaction('inspecciones', 'readwrite');
-            const index = transaction.objectStore('inspecciones').index('placaVehiculo');
-            index.openCursor(plate).onsuccess = (event) => {
-                const cursor = event.target.result;
-                if (cursor) { cursor.delete(); cursor.continue(); }
-            };
-            transaction.oncomplete = () => { database.close(); resolve(); };
-            transaction.onerror = () => { database.close(); reject(transaction.error); };
-        };
-    });
 
     const confirmNewQuote = async () => {
         const currentPlate = placaInput.value.trim().toUpperCase();
         try {
-            await deletePhotosForPlate(currentPlate);
+            await storage.deletePhotosByPlate(currentPlate);
         } catch (error) {
             newQuoteWarningModal.hidden = true;
             alert('No se pudieron eliminar las fotos de la placa actual.');
@@ -592,7 +595,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const newItem = {
-            id: editingItem ? editingItem.id : makeId(),
+            id: editingItem ? editingItem.id : storage.makeId(),
             descrip,
             cant,
             dym,
@@ -630,7 +633,7 @@ document.addEventListener('DOMContentLoaded', () => {
     window.CoticarVoice = {
         register(item) {
             if (!item || !item.descrip) return false;
-            quoteItems.push({ ...item, id: item.id || makeId() });
+            quoteItems.push({ ...item, id: item.id || storage.makeId() });
             renderTable();
             saveState();
             return true;

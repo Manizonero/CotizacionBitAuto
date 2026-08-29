@@ -9,6 +9,7 @@
 <body>
         <nav class="top-nav" aria-label="Navegacion principal">
             <a href="index.html" class="nav-ico" aria-label="Datos" title="Datos"><span aria-hidden="true">📋</span></a>
+            <a href="generales.html" class="nav-ico" aria-label="Generales" title="Generales"><span aria-hidden="true">🚗</span></a>
             <a href="fotos.html" class="nav-ico" aria-label="Fotos" title="Fotos"><span aria-hidden="true">📷</span></a>
             <a href="verificacion.html" class="nav-ico" aria-label="Verificacion" title="Verificacion"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="#315ddc" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg></a>
             <a href="correo.html" class="nav-ico" aria-label="Correo" title="Correo"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="#315ddc" d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4-8 5-8-5V6l8 5 8-5v2z"/></svg></a>
@@ -18,7 +19,14 @@
             <div><p class="eyebrow">BITAUTO / COTIZACION</p><h1>Preparar correo</h1><p id="mailVehicleLabel" class="muted"></p></div>
         </header>
         <section class="mail-panel">
-            <div class="panel-title"><div><p class="eyebrow">DESTINATARIOS</p><h2>Correos predeterminados</h2><p id="selectedRecipients" class="muted">Ningun correo seleccionado</p></div><button id="openRecipientsBtn" class="button primary" type="button">Seleccionar</button></div>
+            <div class="panel-title"><div><p class="eyebrow">GRUPO DE ENVÍO</p><h2>Selecciona el grupo</h2></div></div>
+            <select id="groupSelector" class="wide-input" style="margin-top: 10px;">
+                <option value="">Selecciona un grupo...</option>
+            </select>
+            <div id="groupRecipients" class="muted" style="margin-top: 8px; font-size: 0.9rem;"></div>
+        </section>
+        <section class="mail-panel">
+            <div class="panel-title"><div><p class="eyebrow">DESTINATARIOS</p><h2>Gestionar contactos y grupos</h2><p id="selectedRecipients" class="muted">Ningun correo seleccionado</p></div><button id="openRecipientsBtn" class="button primary" type="button">Configurar</button></div>
         </section>
         <section class="mail-panel">
             <label class="field-label" for="greetingInput">SALUDO</label>
@@ -37,19 +45,54 @@
         </section>
     </main>
     <div id="recipientsModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="recipients-title" hidden>
-        <section class="recipients-modal">
-            <div class="modal-heading"><div><p class="eyebrow">DESTINATARIOS</p><h2 id="recipients-title">Selecciona los correos</h2></div><button id="closeRecipientsBtn" class="close-button" type="button" aria-label="Cerrar">&#10005;</button></div>
-            <div id="contactsList" class="contacts-list"></div>
-            <button id="addContactBtn" class="add-contact-button" type="button" title="Agregar destinatario" aria-label="Agregar destinatario">+</button>
-            <form id="contactForm" class="contact-form" hidden>
-                <input id="contactName" type="text" placeholder="Nombre del correo" required>
-                <input id="contactEmail" type="email" placeholder="correo@ejemplo.com" required>
-                <div class="form-actions"><button id="cancelContactBtn" type="button" class="button secondary">Cancelar</button><button type="submit" class="button primary">Guardar</button></div>
-            </form>
+        <section class="recipients-modal" style="max-width: 800px;">
+            <div class="modal-heading"><div><p class="eyebrow">CONFIGURACIÓN</p><h2 id="recipients-title">Contactos y Grupos</h2></div><button id="closeRecipientsBtn" class="close-button" type="button" aria-label="Cerrar">&#10005;</button></div>
+
+            <div class="modal-tabs" style="display: flex; gap: 10px; margin-bottom: 20px;">
+                <button id="tabContacts" class="button primary" style="flex: 1;">Contactos</button>
+                <button id="tabGroups" class="button secondary" style="flex: 1;">Grupos</button>
+            </div>
+
+            <!-- Sección de Contactos -->
+            <div id="contactsSection">
+                <div id="contactsList" class="contacts-list"></div>
+                <button id="addContactBtn" class="add-contact-button" type="button" title="Agregar destinatario">+</button>
+                <form id="contactForm" class="contact-form" hidden>
+                    <input id="contactName" type="text" placeholder="Nombre" required>
+                    <input id="contactEmail" type="email" placeholder="correo@ejemplo.com" required>
+                    <div class="form-actions"><button id="cancelContactBtn" type="button" class="button secondary">Cancelar</button><button type="submit" class="button primary">Guardar</button></div>
+                </form>
+            </div>
+
+            <!-- Sección de Grupos -->
+            <div id="groupsSection" hidden>
+                <div id="groupsList" class="contacts-list"></div>
+                <button id="addGroupBtn" class="add-contact-button" type="button" title="Agregar grupo">+</button>
+                <form id="groupForm" class="contact-form" hidden>
+                    <input id="groupName" type="text" placeholder="Nombre del Grupo" required style="width: 100%; margin-bottom: 10px; padding: 8px; border-radius: 8px; border: 1px solid #c7d0e9;">
+                    <div class="group-contacts-selector" style="max-height: 200px; overflow-y: auto; border: 1px solid #c7d0e9; padding: 10px; border-radius: 8px; margin-bottom: 10px;">
+                        <p class="eyebrow">Selecciona contactos:</p>
+                        <div id="groupContactsList"></div>
+                    </div>
+                    <div class="form-actions"><button id="cancelGroupBtn" type="button" class="button secondary">Cancelar</button><button type="submit" class="button primary">Guardar Grupo</button></div>
+                </form>
+            </div>
+
             <p id="contactStatus" class="status" aria-live="polite"></p>
-            <button id="saveRecipientsBtn" class="button primary modal-save-button" type="button">Usar seleccionados</button>
+            <button id="saveRecipientsBtn" class="button primary modal-save-button" type="button">Listo</button>
         </section>
     </div>
+
+    <div id="alertModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="alert-title" hidden>
+        <section class="recipients-modal">
+            <div class="modal-heading">
+                <h2 id="alert-title">ATENCIÓN</h2>
+            </div>
+            <p id="alertMessage" style="margin: 20px 0; color: #24314c;"></p>
+            <button id="closeAlertBtn" class="button primary" style="width: 100%;" type="button">Entendido</button>
+        </section>
+    </div>
+    <script src="storage.js"></script>
     <script src="correo.js"></script>
 </body>
 </html>

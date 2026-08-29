@@ -8,37 +8,26 @@
     <script src="https://cdn.jsdelivr.net/npm/exceljs@4.3.0/dist/exceljs.min.js"></script>
 </head>
 <body>
-        <nav class="top-nav" aria-label="Navegacion principal">
-            <a href="index.html" class="nav-ico" aria-label="Datos" title="Datos"><span aria-hidden="true">📋</span></a>
-            <a href="fotos.html" class="nav-ico" aria-label="Fotos" title="Fotos"><span aria-hidden="true">📷</span></a>
-            <a href="verificacion.html" class="nav-ico" aria-label="Verificacion" title="Verificacion"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="#315ddc" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg></a>
-            <a href="correo.html" class="nav-ico" aria-label="Correo" title="Correo"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="#315ddc" d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4-8 5-8-5V6l8 5 8-5v2z"/></svg></a>
-        </nav>
+    <nav class="top-nav" aria-label="Navegacion principal">
+        <a href="index.html" class="nav-ico" aria-label="Datos" title="Datos"><span aria-hidden="true">📋</span></a>
+        <a href="generales.html" class="nav-ico" aria-label="Generales" title="Generales"><span aria-hidden="true">🚗</span></a>
+        <a href="fotos.html" class="nav-ico" aria-label="Fotos" title="Fotos"><span aria-hidden="true">📷</span></a>
+        <a href="verificacion.html" class="nav-ico" aria-label="Verificacion" title="Verificacion"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="#315ddc" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg></a>
+        <a href="correo.html" class="nav-ico" aria-label="Correo" title="Correo"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="#315ddc" d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4-8 5-8-5V6l8 5 8-5v2z"/></svg></a>
+    </nav>
         <main class="photos-app">
         <header class="photos-header">
             <div>
                 <p class="eyebrow">BITAUTO / INSPECCION</p>
-                <h1>Fotos del vehiculo</h1>
+                <h1>Fotos por repuesto</h1>
                 <p id="plateLabel" class="plate-label"></p>
             </div>
         </header>
 
-        <section class="photo-panel" aria-labelledby="capture-title">
-            <div class="panel-heading">
-                <div><h2 id="capture-title">Fotos generales</h2><p id="photoStatus" aria-live="polite">Preparando almacenamiento...</p></div>
-                <strong id="photoCount">0 fotos</strong>
-            </div>
-            <div id="photoGrid" class="photo-grid" aria-live="polite"></div>
-            <div class="capture-actions">
-                <label class="action-button primary" for="photoInput" title="Tomar una foto general">📷 Tomar foto</label>
-                <input id="photoInput" class="visually-hidden" type="file" accept="image/*" capture="environment" multiple>
-                <input id="detailPhotoInput" class="visually-hidden" type="file" accept="image/*" capture="environment">
-            </div>
-        </section>
-
         <section class="photo-panel repuestos-panel" aria-labelledby="repuestos-title">
             <div class="panel-heading">
                 <div><h2 id="repuestos-title">Fotos por repuesto</h2><p class="panel-heading-caption">Cada repuesto tiene su camara y un boton N/A si no aplica foto.</p></div>
+                <strong id="photoCount">0 fotos</strong>
             </div>
             <div id="repuestosList" class="repuestos-list" aria-live="polite"></div>
             <div id="repuestosNa" class="repuestos-na" aria-live="polite" hidden>
@@ -46,7 +35,7 @@
                 <p class="panel-heading-caption">Estos repuestos sin foto se mostraran aqui para decidir si les tomas alguna foto.</p>
                 <div id="repuestosNaList" class="repuestos-list"></div>
             </div>
-                </section>
+        </section>
         <div class="download-actions">
             <button id="downloadPhotosBtn" class="action-button" type="button">Descargar fotos</button>
             <button id="createSuzukiBtn" class="action-button" type="button" hidden>Descargar formato DERCO</button>
@@ -65,6 +54,17 @@
             <div class="delete-modal-actions"><button id="cancelDeleteBtn" type="button">Cancelar</button><button id="confirmDeleteBtn" class="confirm-delete-button" type="button">Eliminar</button></div>
         </div>
     </div>
+
+    <div id="alertModal" class="delete-modal" role="dialog" aria-modal="true" aria-labelledby="alertTitle" hidden>
+        <div class="delete-modal-card">
+            <h2 id="alertTitle">ATENCIÓN</h2>
+            <p id="alertMessage"></p>
+            <div class="delete-modal-actions">
+                <button id="closeAlertBtn" class="action-button" type="button">Entendido</button>
+            </div>
+        </div>
+    </div>
+    <script src="storage.js"></script>
     <script src="fotos.js"></script>
 </body>
 </html>

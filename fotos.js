@@ -1,14 +1,12 @@
 (() => {
     'use strict';
 
-    const DB_NAME = 'TallerDB';
-    const STORE_NAME = 'inspecciones';
+    const storage = window.AppStorage;
     const MAX_WIDTH = 1280;
     const MAX_HEIGHT = 960;
     const JPEG_QUALITY = 0.75;
     const params = new URLSearchParams(location.search);
     const $ = (id) => document.getElementById(id);
-    let db;
     let photos = [];
     let currentPhoto;
     let sourceImage;
@@ -16,7 +14,7 @@
     let points = [];
     let annotations = [];
     let movingAnnotation;
-        let moveOffset;
+    let moveOffset;
     let annotationMode = 'auto';
     let photoPendingDelete;
     let repuestoToDelete;
@@ -24,44 +22,31 @@
 
     function getPlate() {
         if (params.get('placa')) return params.get('placa').trim().toUpperCase();
-        try { return (JSON.parse(localStorage.getItem('coticarQuoteState'))?.fields?.placa || '').trim().toUpperCase(); } catch (error) { return ''; }
+        return storage.getPlate();
     }
     function savedPartDescriptions() {
-        try {
-            const state = JSON.parse(localStorage.getItem('coticarQuoteState'));
-            return [...new Set((Array.isArray(state?.quoteItems) ? state.quoteItems : []).map((item) => item.descrip?.trim()).filter(Boolean))];
-        } catch (error) { return []; }
-    }
-    function makeId() {
-        return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+        const state = storage.getState();
+        return [...new Set((Array.isArray(state?.quoteItems) ? state.quoteItems : []).map((item) => item.descrip?.trim()).filter(Boolean))];
     }
     function savedRepuestos() {
-        let state = {};
-        try { state = JSON.parse(localStorage.getItem('coticarQuoteState') || '{}'); } catch (error) { state = {}; }
+        const state = storage.getState();
         let items = Array.isArray(state.quoteItems) ? state.quoteItems : [];
         let changed = false;
         items = items.map((item) => {
             if (!item || item.id) return item;
             changed = true;
-            return { ...item, id: makeId() };
+            return { ...item, id: storage.makeId() };
         });
         if (changed) {
-            try { state.quoteItems = items; localStorage.setItem('coticarQuoteState', JSON.stringify(state)); } catch (error) {}
+            storage.updateQuoteItems(items);
         }
         return items;
     }
     function savedNaIds() {
-        try {
-            const state = JSON.parse(localStorage.getItem('coticarQuoteState') || '{}');
-            return new Set(Array.isArray(state.naItems) ? state.naItems : []);
-        } catch (error) { return new Set(); }
+        return storage.getNaIds();
     }
     function saveNaIds(idSet) {
-        try {
-            const state = JSON.parse(localStorage.getItem('coticarQuoteState') || '{}');
-            state.naItems = Array.isArray(idSet) ? idSet : [...idSet];
-            localStorage.setItem('coticarQuoteState', JSON.stringify(state));
-        } catch (error) {}
+        storage.saveNaIds(idSet);
     }
     function updateEditorPartSuggestions(filter = '') {
         const menu = $('editorPartsMenu');
@@ -98,55 +83,14 @@
         if (inp) inp.value = '';
     }
     function setStatus(text) { $('photoStatus').textContent = text; }
-    function openDatabase() {
-        return new Promise((resolve, reject) => {
-            const request = indexedDB.open(DB_NAME, 1);
-            request.onupgradeneeded = () => { const store = request.result.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true }); store.createIndex('placaVehiculo', 'placaVehiculo'); };
-            request.onsuccess = () => { db = request.result; resolve(); };
-            request.onerror = () => reject(request.error);
-        });
+
+    function render() {
+        renderRepuestos();
     }
-    function store(mode) { return db.transaction(STORE_NAME, mode).objectStore(STORE_NAME); }
-    function save(record) {
-        return new Promise((resolve, reject) => { const request = store('readwrite').put(record); request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error); });
-    }
-    function recordsForPlate() {
-        return new Promise((resolve, reject) => { const request = store('readonly').index('placaVehiculo').getAll(getPlate()); request.onsuccess = () => resolve(request.result.filter((record) => record.blob?.size).sort((a, b) => a.createdAt - b.createdAt)); request.onerror = () => reject(request.error); });
-    }
-    function compress(file, label) {
-        return new Promise((resolve, reject) => {
-            const image = new Image();
-            const url = URL.createObjectURL(file);
-            image.onload = () => {
-                const scale = Math.min(1, MAX_WIDTH / image.width, MAX_HEIGHT / image.height);
-                const canvas = document.createElement('canvas');
-                canvas.width = Math.max(1, Math.round(image.width * scale));
-                canvas.height = Math.max(1, Math.round(image.height * scale));
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
-                URL.revokeObjectURL(url);
-                if (label) {
-                    const fontSize = Math.max(12, Math.floor(canvas.width / 55));
-                    ctx.font = `700 ${fontSize}px Oxanium, sans-serif`;
-                    ctx.textBaseline = 'alphabetic';
-                    const textWidth = ctx.measureText(label).width;
-                    const pad = Math.max(4, Math.floor(canvas.width * 0.012));
-                    const lineHeight = Math.ceil(fontSize * 1.35);
-                    const boxX = canvas.width - textWidth - pad * 2;
-                    const boxW = textWidth + pad * 2;
-                    const boxH = lineHeight + pad * 2;
-                    const boxY = canvas.height - boxH;
-                    ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
-                    ctx.fillRect(boxX, boxY, boxW, boxH);
-                    ctx.fillStyle = '#111827';
-                    ctx.textBaseline = 'middle';
-                    ctx.fillText(label, boxX + pad, boxY + pad + lineHeight / 2);
-                }
-                canvas.toBlob(resolve, 'image/jpeg', JPEG_QUALITY);
-            };
-            image.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Imagen no valida')); };
-            image.src = url;
-        });
+    async function refresh() {
+        photos = getPlate() ? await storage.getPhotosByPlate(getPlate()) : [];
+        render();
+        setStatus(getPlate() ? `${photos.length} fotos guardadas localmente para ${getPlate()}.` : 'Vuelve a la cotizacion y registra una placa.');
     }
     function renderPhotoCards(grid, photoList, showDelete) {
         photoList.forEach((photo) => {
@@ -191,7 +135,7 @@
             card.setAttribute('role', 'button');
             card.tabIndex = 0;
             card.addEventListener('click', () => toggleNa(item));
-                        card.addEventListener('keydown', (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggleNa(item); } });
+            card.addEventListener('keydown', (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggleNa(item); } });
             return card;
         }
         const id = item.id;
@@ -258,7 +202,7 @@
         card.appendChild(counter);
         return card;
     }
-        function renderRepuestos() {
+    function renderRepuestos() {
         const container = $('repuestosList');
         const naWrapper = $('repuestosNa');
         const naList = $('repuestosNaList');
@@ -288,21 +232,9 @@
         saveNaIds(naIds);
         render();
     }
-    function render() {
-        const grid = $('photoGrid'); grid.innerHTML = '';
-        const generalPhotos = photos.filter((photo) => !photo.repuestoId);
-        renderPhotoCards(grid, generalPhotos, true);
-        $('photoCount').textContent = `${photos.length} ${photos.length === 1 ? 'foto' : 'fotos'}`;
-        renderRepuestos();
-    }
-    async function refresh() {
-        photos = getPlate() ? await recordsForPlate() : [];
-        render();
-        setStatus(getPlate() ? `${photos.length} fotos guardadas localmente para ${getPlate()}.` : 'Vuelve a la cotizacion y registra una placa.');
-    }
     async function processFiles(event, openDetail, repuesto) {
         if (!getPlate()) { setStatus('No hay placa activa.'); return; }
-        try { for (const file of event.target.files) await save({ placaVehiculo: getPlate(), blob: await compress(file, repuesto && repuesto.descrip), marked: false, createdAt: Date.now(), repuestoId: repuesto && repuesto.id ? String(repuesto.id) : undefined, repuesto: repuesto && repuesto.descrip ? repuesto.descrip : undefined }); await refresh(); if (openDetail && photos.length) openEditor(photos[photos.length - 1]); } catch (error) { setStatus(`No se pudo guardar la foto: ${error.message}`); }
+        try { for (const file of event.target.files) await storage.savePhoto({ placaVehiculo: getPlate(), blob: await compress(file, repuesto && repuesto.descrip), marked: false, createdAt: Date.now(), repuestoId: repuesto && repuesto.id ? String(repuesto.id) : undefined, repuesto: repuesto && repuesto.descrip ? repuesto.descrip : undefined }); await refresh(); if (openDetail && photos.length) openEditor(photos[photos.length - 1]); } catch (error) { setStatus(`No se pudo guardar la foto: ${error.message}`); }
         event.target.value = '';
     }
     function pointFromEvent(event) { const canvas = $('photoCanvas'); const rect = canvas.getBoundingClientRect(); return { x: (event.clientX - rect.left) * canvas.width / rect.width, y: (event.clientY - rect.top) * canvas.height / rect.height }; }
@@ -358,9 +290,6 @@
     let editorHistoryGuardAttached = false;
     function closeEditorOnBack(event) { if ($('photoEditor') && !$('photoEditor').hidden) { event.preventDefault(); $('photoEditor').hidden = true; if (editorHistoryGuardAttached) { history.pushState(null, ''); } } }
     function undoLastStroke() { if (!annotations.length) { if (sourceImage) redraw(); return; } annotations.pop(); if (sourceImage) redraw(); }
-    function deleteRecord(id) {
-        return new Promise((resolve, reject) => { const request = store('readwrite').delete(id); request.onsuccess = resolve; request.onerror = () => reject(request.error); });
-    }
     function deletePhoto(photo) {
         if (!photo) return;
         photoPendingDelete = photo;
@@ -372,24 +301,30 @@
         photoPendingDelete = null;
         repuestoToDelete = null;
         $('deleteModal').hidden = true;
+
         if (repuesto) {
             let allRecords = [];
-            try { allRecords = await recordsForPlate(); } catch (error) { setStatus(`No se pudieron cargar las fotos: ${error.message}`); return; }
+            try { allRecords = await storage.getPhotosByPlate(getPlate()); } catch (error) { setStatus(`No se pudieron cargar las fotos: ${error.message}`); return; }
             const toRemove = allRecords.filter((photo) => String(photo.repuestoId) === String(repuesto.id));
             if (toRemove.length) setStatus(`Eliminando ${toRemove.length} foto(s)...`);
-            for (const photo of toRemove) {
-                try { await deleteRecord(photo.id); } catch (error) { setStatus('No se pudo eliminar una foto: ' + error.message); }
+            for (const p of toRemove) {
+                try { await storage.deletePhoto(p.id); } catch (error) { setStatus('No se pudo eliminar una foto: ' + error.message); }
             }
             await refresh();
             return;
         }
         if (!photo) return;
-        await deleteRecord(photo.id);
+        await storage.deletePhoto(photo.id);
         await refresh();
     }
-    async function saveMarked() { const blob = await new Promise((resolve) => $('photoCanvas').toBlob(resolve, 'image/jpeg', JPEG_QUALITY)); await save({ ...currentPhoto, blob, marked: true }); $('photoEditor').hidden = true; await refresh(); }
+    async function saveMarked() {
+        const blob = await new Promise((resolve) => $('photoCanvas').toBlob(resolve, 'image/jpeg', JPEG_QUALITY));
+        await storage.savePhoto({ ...currentPhoto, blob, marked: true });
+        $('photoEditor').hidden = true;
+        await refresh();
+    }
     async function downloadAll() {
-        const records = await recordsForPlate();
+        const records = await storage.getPhotosByPlate(getPlate());
         if (!records.length) { setStatus('No hay fotos para descargar.'); return; }
         setStatus(`Preparando ${records.length} fotos para descargar...`);
         for (const [index, photo] of records.entries()) {
@@ -406,20 +341,18 @@
             await new Promise((resolve) => setTimeout(resolve, 350));
         }
         try {
-            const state = JSON.parse(localStorage.getItem('coticarQuoteState') || '{}');
+            const state = storage.getState();
             state.photosDownloadedFor = getPlate();
-            localStorage.setItem('coticarQuoteState', JSON.stringify(state));
+            state.photosDownloaded = true; // Actualizamos el flag
+            storage.saveState(state);
             setStatus(`${records.length} fotos enviadas a Descargas.`);
         } catch (error) { setStatus(`${records.length} fotos descargadas.`); }
     }
 
-    function savedState() {
-        try { return JSON.parse(localStorage.getItem('coticarQuoteState') || '{}'); } catch (error) { return {}; }
-    }
-
     function getSuzukiMarca() {
         if (params.get('marca')) return params.get('marca').trim().toUpperCase();
-        return String((savedState().fields || {}).marca || '').trim().toUpperCase();
+        const state = storage.getState();
+        return String((state.fields || {}).marca || '').trim().toUpperCase();
     }
 
     async function generateSuzukiSpreadsheet(state) {
@@ -470,13 +403,19 @@
         const isEligible = marca === 'suzuki' || marca === 'citroen';
         button.hidden = !isEligible;
         if (!isEligible) return;
-        button.addEventListener('click', () => generateSuzukiSpreadsheet(savedState()));
+        button.addEventListener('click', () => generateSuzukiSpreadsheet(storage.getState()));
     }
 
     async function init() {
         setupSuzukiExport();
         $('plateLabel').textContent = getPlate() ? `PLACA: ${getPlate()}` : 'Sin placa seleccionada';
-        try { await openDatabase(); await refresh(); } catch (error) { setStatus('IndexedDB no esta disponible en este navegador.'); return; }
+        try {
+            await storage.openDB();
+            await refresh();
+        } catch (error) {
+            setStatus('IndexedDB no esta disponible en este navegador.');
+            return;
+        }
         $('photoInput').addEventListener('change', (event) => processFiles(event, false)); $('detailPhotoInput').addEventListener('change', (event) => processFiles(event, true)); $('downloadPhotosBtn').addEventListener('click', downloadAll); $('cancelDeleteBtn').addEventListener('click', () => { photoPendingDelete = null; repuestoToDelete = null; $('deleteModal').hidden = true; }); $('confirmDeleteBtn').addEventListener('click', confirmDeletePhoto); $('cancelEditBtn').addEventListener('click', () => { $('photoEditor').hidden = true; }); $('clearDrawingBtn').addEventListener('click', undoLastStroke); $('saveMarkedBtn').addEventListener('click', saveMarked);
         const damageSelect = $('damageSelect'); if (damageSelect) damageSelect.addEventListener('change', () => { if (damageSelect.value) addTextAnnotation(damageSelect.value); }); const repuestoSelect = $('repuestoSelect'); if (repuestoSelect) { savedPartDescriptions().forEach((description) => { const opt = document.createElement('option'); opt.value = description; opt.textContent = description; repuestoSelect.appendChild(opt); }); repuestoSelect.addEventListener('change', () => { if (repuestoSelect.value) addRepuestoAnnotation(repuestoSelect.value); }); } const canvas = $('photoCanvas'); canvas.addEventListener('pointerdown', startDraw); canvas.addEventListener('pointermove', continueDraw); canvas.addEventListener('pointerup', finishDraw); canvas.addEventListener('pointercancel', finishDraw); const context = canvas.getContext('2d'); context.strokeStyle = '#ef2222'; context.lineWidth = annotationStrokeWidth(); context.lineCap = 'round';
     }

@@ -4,13 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>COTIZACION</title>
-    <link rel="stylesheet" href="Styles.Css">
+    <link rel="stylesheet" href="styles.css">
     <script src="https://cdn.jsdelivr.net/npm/exceljs@4.3.0/dist/exceljs.min.js"></script>
 
 </head>
 <body>
         <nav class="top-nav" aria-label="Navegacion principal">
             <a href="index.html" class="nav-ico" aria-label="Datos" title="Datos"><span aria-hidden="true">📋</span></a>
+            <a href="generales.html" class="nav-ico" aria-label="Generales" title="Generales"><span aria-hidden="true">🚗</span></a>
             <a id="photosLink" href="fotos.html" class="nav-ico" aria-label="Fotos" title="Fotos"><span aria-hidden="true">📷</span></a>
             <a href="verificacion.html" class="nav-ico" aria-label="Verificacion" title="Verificacion"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="#315ddc" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg></a>
             <a href="correo.html" class="nav-ico" aria-label="Correo" title="Correo"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="#315ddc" d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4-8 5-8-5V6l8 5 8-5v2z"/></svg></a>
@@ -200,6 +201,17 @@
         </div>
     </div>
 
+    <div id="alertModal" class="user-modal" role="dialog" aria-modal="true" aria-labelledby="alert-title" hidden>
+        <div class="user-modal-content">
+            <h2 id="alert-title">ATENCIÓN</h2>
+            <p id="alertMessage"></p>
+            <div class="new-quote-warning-actions">
+                <button id="closeAlertBtn" class="secondary-button" type="button">Entendido</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="storage.js"></script>
     <script src="script.js"></script>
     <script src="voice.js"></script>
 </body>

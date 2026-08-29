@@ -2,41 +2,33 @@
     'use strict';
 
     const $ = (id) => document.getElementById(id);
-    const STATE_KEY = 'coticarQuoteState';
+    const storage = window.AppStorage;
 
-    function getState() {
-        try { return JSON.parse(localStorage.getItem(STATE_KEY) || '{}'); } catch (error) { return {}; }
-    }
-    function saveState(state) {
-        try { localStorage.setItem(STATE_KEY, JSON.stringify(state)); } catch (error) {}
-    }
     function getRepuestos() {
-        const state = getState();
+        const state = storage.getState();
         let items = Array.isArray(state.quoteItems) ? state.quoteItems : [];
         let changed = false;
         items = items.map((item) => {
             if (!item || item.id) return item;
             changed = true;
-            return { ...item, id: Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8) };
+            return { ...item, id: storage.makeId() };
         });
         if (changed) {
-            state.quoteItems = items;
-            saveState(state);
+            storage.updateQuoteItems(items);
         }
         return items;
     }
     function getVerified() {
-        const state = getState();
+        const state = storage.getState();
         return new Set(Array.isArray(state.verifiedRepuestos) ? state.verifiedRepuestos : []);
     }
     function setVerified(idSet) {
-        const state = getState();
+        const state = storage.getState();
         state.verifiedRepuestos = [...idSet];
-        saveState(state);
+        storage.saveState(state);
     }
     function getPlate() {
-        const state = getState();
-        return String((state.fields && state.fields.placa) || '').trim().toUpperCase();
+        return storage.getPlate();
     }
 
     function render() {
@@ -99,9 +91,9 @@
         const plateEl = $('verifPlateLabel');
         if (plateEl) plateEl.textContent = getPlate() ? `PLACA: ${getPlate()}` : 'Sin placa seleccionada';
         $('resetBtn').addEventListener('click', () => {
-            const state = getState();
+            const state = storage.getState();
             state.verifiedRepuestos = [];
-            saveState(state);
+            storage.saveState(state);
             render();
             $('verifStatus').textContent = 'Lista restablecida. Selecciona los repuestos que ingresaste.';
         });
