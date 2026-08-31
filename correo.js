@@ -3,31 +3,32 @@
     const storage = window.AppStorage;
     const $ = (id) => document.getElementById(id);
 
-    const state = storage.getState();
-    const fields = state.fields || {};
-    let contacts = storage.getContacts();
-    let groups = storage.getGroups();
-    let settings = storage.getSettings();
-    const items = Array.isArray(state.quoteItems) ? state.quoteItems : [];
-    const statusOrder = { CAMBIO: 0, RECUPERACION: 1, FUERTE: 2, MEDIO: 3, LEVE: 4 };
+    let state, fields, contacts, groups, settings, orderedItems;
 
-    const orderedItems = items
-        .map((item, index) => ({ item, index }))
-        .sort((a, b) => {
-            const orderA = statusOrder[String(a.item.estado || '').trim().toUpperCase()] ?? 5;
-            const orderB = statusOrder[String(b.item.estado || '').trim().toUpperCase()] ?? 5;
-            return orderA - orderB || a.index - b.index;
-        })
-        .map(({ item }) => item);
+    const refreshLocalData = () => {
+        state = storage.getState();
+        fields = state.fields || {};
+        contacts = storage.getContacts();
+        groups = storage.getGroups();
+        settings = storage.getSettings();
+        const items = Array.isArray(state.quoteItems) ? state.quoteItems : [];
+        const statusOrder = { CAMBIO: 0, RECUPERACION: 1, FUERTE: 2, MEDIO: 3, LEVE: 4 };
 
-    let editingContactIndex = null;
-    let editingGroupIndex = null;
-
-    const subject = () => {
-        const freshState = storage.getState();
-        const f = freshState.fields || {};
-        return `COTIZACION ${f.marca || ''} ${f.placa || ''} ${f.linea || ''} ${f.tipoCliente || ''}`.replace(/\s+/g, ' ').trim();
+        orderedItems = items
+            .map((item, index) => ({ item, index }))
+            .sort((a, b) => {
+                const orderA = statusOrder[String(a.item.estado || '').trim().toUpperCase()] ?? 5;
+                const orderB = statusOrder[String(b.item.estado || '').trim().toUpperCase()] ?? 5;
+                return orderA - orderB || a.index - b.index;
+            })
+            .map(({ item }) => item);
     };
+
+    const getSubjectText = () => {
+        refreshLocalData();
+        return `COTIZACION ${fields.marca || ''} ${fields.placa || ''} ${fields.linea || ''} ${fields.tipoCliente || ''}`.replace(/\s+/g, ' ').trim();
+    };
+
     const fitCell = (value, width) => String(value || '-').replace(/[\r\n]+/g, ' ').slice(0, width).padEnd(width, ' ');
 
     const partsGrid = () => {
@@ -57,6 +58,47 @@
     const bodyText = () => {
         const grid = orderedItems.length ? partsGrid() : 'No hay repuestos registrados.';
         return `${$('greetingInput').value.trim() || 'Cordial saludo,'}\n\nDatos del vehiculo\nFecha: ${fields.fecha || '-'}\nPlaca: ${fields.placa || '-'}\nMarca: ${fields.marca || '-'}\nLinea: ${fields.linea || '-'}\nModelo: ${fields.modelo || '-'}\nColor: ${fields.color || '-'}\nTipo de cliente: ${fields.tipoCliente || '-'}${fields.cilindraje ? `\nCilindraje: ${fields.cilindraje}` : ''}${fields.vin ? `\nVIN: ${fields.vin}` : ''}\n\nRepuestos solicitados\n${grid}`;
+    };
+
+    const renderVehiclePreview = () => {
+        const greeting = $('mailPreviewGreeting');
+        if (greeting) greeting.textContent = $('greetingInput').value.trim() || 'Cordial saludo,';
+        const wrap = $('mailVehicleTableWrap');
+        if (!wrap) return;
+        const table = document.createElement('table');
+        table.className = 'mail-vehicle-table';
+        const fieldsToShow = [['Fecha', fields.fecha], ['Placa', fields.placa], ['Marca', fields.marca], ['Linea', fields.linea], ['Modelo', fields.modelo], ['Color', fields.color], ['Tipo de cliente', fields.tipoCliente]];
+        const header = document.createElement('tr');
+        fieldsToShow.forEach(([label]) => { const cell = document.createElement('th'); cell.textContent = label; header.appendChild(cell); });
+        const values = document.createElement('tr');
+        fieldsToShow.forEach(([, value]) => { const cell = document.createElement('td'); cell.textContent = value || '-'; values.appendChild(cell); });
+        table.append(header, values);
+        wrap.replaceChildren(table);
+    };
+
+    const renderItemsTable = () => {
+        const body = $('mailItemsTableBody');
+        if (!body) return;
+        body.innerHTML = '';
+        orderedItems.forEach((item, index) => {
+            const row = document.createElement('tr');
+            [String(index + 1), item.descrip, item.cant, item.estado, item.pint, item.dat].forEach((value) => {
+                const cell = document.createElement('td');
+                cell.textContent = value || '-';
+                row.appendChild(cell);
+            });
+            body.appendChild(row);
+        });
+    };
+
+    const updatePreview = () => {
+        refreshLocalData();
+        const sub = $('subjectInput');
+        if (sub) sub.value = getSubjectText();
+        const label = $('mailVehicleLabel');
+        if (label) label.textContent = `${fields.marca || '-'} ${fields.linea || '-'} / ${fields.placa || '-'}`;
+        renderVehiclePreview();
+        renderItemsTable();
     };
 
     const saveContacts = () => storage.saveContacts(contacts);
@@ -111,44 +153,6 @@
         });
     };
 
-    const renderItemsTable = () => {
-        const body = $('mailItemsTableBody');
-        if (!body) return;
-        body.innerHTML = '';
-        orderedItems.forEach((item, index) => {
-            const row = document.createElement('tr');
-            [String(index + 1), item.descrip, item.cant, item.estado, item.pint, item.dat].forEach((value) => {
-                const cell = document.createElement('td');
-                cell.textContent = value || '-';
-                row.appendChild(cell);
-            });
-            body.appendChild(row);
-        });
-    };
-
-    const renderVehiclePreview = () => {
-        const greeting = $('mailPreviewGreeting');
-        if (greeting) greeting.textContent = $('greetingInput').value.trim() || 'Cordial saludo,';
-        const wrap = $('mailVehicleTableWrap');
-        if (!wrap) return;
-        const table = document.createElement('table');
-        table.className = 'mail-vehicle-table';
-        const fieldsToShow = [['Fecha', fields.fecha], ['Placa', fields.placa], ['Marca', fields.marca], ['Linea', fields.linea], ['Modelo', fields.modelo], ['Color', fields.color], ['Tipo de cliente', fields.tipoCliente]];
-        const header = document.createElement('tr');
-        fieldsToShow.forEach(([label]) => { const cell = document.createElement('th'); cell.textContent = label; header.appendChild(cell); });
-        const values = document.createElement('tr');
-        fieldsToShow.forEach(([, value]) => { const cell = document.createElement('td'); cell.textContent = value || '-'; values.appendChild(cell); });
-        table.append(header, values);
-        wrap.replaceChildren(table);
-    };
-
-    const updatePreview = () => {
-        const sub = $('subjectInput');
-        if (sub) sub.value = subject();
-        renderVehiclePreview();
-        renderItemsTable();
-    };
-
     const copyRichBody = async () => {
         const html = richBody();
         if (navigator.clipboard?.write && window.ClipboardItem) {
@@ -172,8 +176,8 @@
         if (!copied) throw new Error('El navegador no permitio copiar la tabla');
     };
 
-    // Event Listeners
     document.addEventListener('DOMContentLoaded', () => {
+        refreshLocalData();
         $('greetingInput').value = settings.greeting || '';
         $('greetingInput').addEventListener('input', () => { settings.greeting = $('greetingInput').value; saveSettings(); updatePreview(); });
 
@@ -181,7 +185,6 @@
         $('closeRecipientsBtn').addEventListener('click', () => { $('recipientsModal').hidden = true; updateGroupSelector(); });
         $('saveRecipientsBtn').addEventListener('click', () => { $('recipientsModal').hidden = true; updateGroupSelector(); });
 
-        // Tabs
         $('tabContacts').addEventListener('click', () => {
             $('contactsSection').hidden = false; $('groupsSection').hidden = true;
             $('tabContacts').className = 'button primary'; $('tabGroups').className = 'button secondary';
@@ -192,54 +195,27 @@
             renderGroupContactsSelector();
         });
 
-        // Gestión de Contactos
-        $('addContactBtn').addEventListener('click', () => { editingContactIndex = null; $('contactForm').reset(); $('contactForm').hidden = false; });
+        $('addContactBtn').addEventListener('click', () => { $('contactForm').reset(); $('contactForm').hidden = false; });
         $('cancelContactBtn').addEventListener('click', () => { $('contactForm').hidden = true; });
         $('contactForm').addEventListener('submit', (e) => {
             e.preventDefault();
             const name = $('contactName').value.trim();
             const email = $('contactEmail').value.trim().toLowerCase();
-            if (editingContactIndex === null) contacts.push({ name, email });
-            else contacts[editingContactIndex] = { name, email };
+            contacts.push({ name, email });
             saveContacts(); renderContacts(); $('contactForm').hidden = true;
         });
-        $('contactsList').addEventListener('click', (e) => {
-            const btn = e.target;
-            const index = Number(btn.dataset.index);
-            if (btn.classList.contains('delete-contact')) { contacts.splice(index, 1); saveContacts(); renderContacts(); }
-            if (btn.classList.contains('edit-contact')) {
-                editingContactIndex = index;
-                $('contactName').value = contacts[index].name;
-                $('contactEmail').value = contacts[index].email;
-                $('contactForm').hidden = false;
-            }
-        });
 
-        // Gestión de Grupos
-        $('addGroupBtn').addEventListener('click', () => { editingGroupIndex = null; $('groupForm').reset(); $('groupForm').hidden = false; renderGroupContactsSelector(); });
+        $('addGroupBtn').addEventListener('click', () => { $('groupForm').reset(); $('groupForm').hidden = false; renderGroupContactsSelector(); });
         $('cancelGroupBtn').addEventListener('click', () => { $('groupForm').hidden = true; });
         $('groupForm').addEventListener('submit', (e) => {
             e.preventDefault();
             const name = $('groupName').value.trim();
             const selectedEmails = Array.from($('groupContactsList').querySelectorAll('input:checked')).map(cb => cb.value);
-            if (selectedEmails.length === 0) { alert('Selecciona al menos un contacto para el grupo.'); return; }
-            if (editingGroupIndex === null) groups.push({ name, emails: selectedEmails });
-            else groups[editingGroupIndex] = { name, emails: selectedEmails };
+            if (selectedEmails.length === 0) return;
+            groups.push({ name, emails: selectedEmails });
             saveGroups(); renderGroups(); $('groupForm').hidden = true;
         });
-        $('groupsList').addEventListener('click', (e) => {
-            const btn = e.target;
-            const index = Number(btn.dataset.index);
-            if (btn.classList.contains('delete-group')) { groups.splice(index, 1); saveGroups(); renderGroups(); }
-            if (btn.classList.contains('edit-group')) {
-                editingGroupIndex = index;
-                $('groupName').value = groups[index].name;
-                $('groupForm').hidden = false;
-                renderGroupContactsSelector(groups[index].emails);
-            }
-        });
 
-        // Selector de Grupo Principal
         $('groupSelector').addEventListener('change', (e) => {
             const groupIndex = e.target.value;
             if (groupIndex === "") { $('groupRecipients').textContent = ""; return; }
@@ -247,26 +223,14 @@
             $('groupRecipients').textContent = "Enviar a: " + group.emails.join(", ");
         });
 
-        // Enviar Correo
         $('openGmailBtn').addEventListener('click', async () => {
             const groupIndex = $('groupSelector').value;
-            if (groupIndex === "") {
-                const alertModal = $('alertModal');
-                $('alertMessage').textContent = 'Debes elegir a qué grupo enviar el correo antes de continuar.';
-                alertModal.hidden = false;
-                return;
-            }
-
+            if (groupIndex === "") { $('alertMessage').textContent = 'Debes elegir un grupo.'; $('alertModal').hidden = false; return; }
             const group = groups[groupIndex];
             const recipients = group.emails.join(',');
-            const subjectValue = subject();
-
+            const subjectValue = getSubjectText();
             const currentState = storage.getState();
-            if (!currentState.photosDownloaded) {
-                $('alertMessage').textContent = 'No puedes abrir el correo sin antes haber descargado las imágenes del vehículo.';
-                $('alertModal').hidden = false;
-                return;
-            }
+            if (!currentState.photosDownloaded) { $('alertMessage').textContent = 'Descarga las fotos primero.'; $('alertModal').hidden = false; return; }
 
             let copied = true;
             try { await copyRichBody(); } catch (error) { copied = false; }
@@ -274,23 +238,16 @@
 
             const webUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(recipients)}&su=${encodeURIComponent(subjectValue)}`;
             const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-
             if (isMobile) {
                 const composeQuery = `to=${encodeURIComponent(recipients)}&subject=${encodeURIComponent(subjectValue)}`;
-                const gmailAppUrl = /Android/i.test(navigator.userAgent)
-                    ? `intent://compose?${composeQuery}#Intent;scheme=mailto;package=com.google.android.gm;end`
-                    : `googlegmail://co?${composeQuery}`;
-                window.location.href = gmailAppUrl;
+                window.location.href = /Android/i.test(navigator.userAgent) ? `intent://compose?${composeQuery}#Intent;scheme=mailto;package=com.google.android.gm;end` : `googlegmail://co?${composeQuery}`;
                 setTimeout(() => { if (document.visibilityState === 'visible') window.location.href = webUrl; }, 1200);
             } else {
                 window.open(webUrl, '_blank') || (window.location.href = webUrl);
             }
-            $('mailStatus').textContent = copied ? 'Tabla copiada. Pegala en Gmail.' : 'Gmail abierto. Copia la tabla manualmente.';
         });
 
         $('closeAlertBtn').addEventListener('click', () => $('alertModal').hidden = true);
-
-        $('mailVehicleLabel').textContent = `${fields.marca || '-'} ${fields.linea || '-'} / ${fields.placa || '-'}`;
         updateGroupSelector();
         updatePreview();
         storage.highlightActiveNav();
