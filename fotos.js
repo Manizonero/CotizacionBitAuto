@@ -7,27 +7,34 @@
     const JPEG_QUALITY = 0.75;
     const params = new URLSearchParams(location.search);
     const $ = (id) => document.getElementById(id);
+
     let photos = [];
     let currentPhoto;
     let sourceImage;
     let drawing = false;
     let points = [];
     let annotations = [];
-    let movingAnnotation;
-    let moveOffset;
-    let annotationMode = 'auto';
-    let photoPendingDelete;
-    let repuestoToDelete;
-    const annotationStrokeWidth = () => Math.max(12, Math.min(32, Math.max($('photoCanvas').width, $('photoCanvas').height) / 140));
+    let movingAnnotation = null;
+    let moveOffset = null;
+    let photoPendingDelete = null;
+    let repuestoToDelete = null;
+
+    const annotationStrokeWidth = () => {
+        const canvas = $('photoCanvas');
+        if (!canvas) return 12;
+        return Math.max(12, Math.min(32, Math.max(canvas.width, canvas.height) / 140));
+    };
 
     function getPlate() {
         if (params.get('placa')) return params.get('placa').trim().toUpperCase();
         return storage.getPlate();
     }
+
     function savedPartDescriptions() {
         const state = storage.getState();
         return [...new Set((Array.isArray(state?.quoteItems) ? state.quoteItems : []).map((item) => item.descrip?.trim()).filter(Boolean))];
     }
+
     function savedRepuestos() {
         const state = storage.getState();
         let items = Array.isArray(state.quoteItems) ? state.quoteItems : [];
@@ -42,57 +49,37 @@
         }
         return items;
     }
+
     function savedNaIds() {
         return storage.getNaIds();
     }
-    function saveNaIds(idSet) {
-        storage.saveNaIds(idSet);
+
+    function toggleNa(item) {
+        const naIds = savedNaIds();
+        if (naIds.has(item.id)) naIds.delete(item.id);
+        else naIds.add(item.id);
+        storage.saveNaIds(naIds);
+        render();
     }
-    function updateEditorPartSuggestions(filter = '') {
-        const menu = $('editorPartsMenu');
-        if (!menu) return;
-        const query = filter.trim().toLowerCase();
-        const descriptions = savedPartDescriptions(); menu.innerHTML = '';
-        descriptions.filter((description) => !query || description.toLowerCase().includes(query)).forEach((description) => {
-            const option = document.createElement('button');
-            option.type = 'button';
-            option.className = 'editor-part-option';
-            option.setAttribute('role', 'option');
-            option.value = description;
-            option.textContent = description;
-            option.addEventListener('click', () => addTextAnnotation(description));
-            menu.appendChild(option);
-        });
-        if (menu.children.length) menu.hidden = false;
-        else if (!descriptions.length) menu.hidden = true;
+
+    function setStatus(text) {
+        const el = $('photoStatus');
+        if (el) el.textContent = text;
     }
-    function addTextAnnotation(value) {
-        if (!value.trim()) return;
-        const canvas = $('photoCanvas');
-        annotations.push({ type: 'text', text: value.trim(), x: canvas.width / 2, y: canvas.height / 2 });
-        redraw();
-        const s = $('damageSelect');
-        if (s) s.value = '';
+
+    async function refresh() {
+        const plate = getPlate();
+        photos = plate ? await storage.getPhotosByPlate(plate) : [];
+        render();
+        setStatus(plate ? `${photos.length} fotos guardadas para ${plate}.` : 'Vuelve a la cotización y registra una placa.');
     }
-    function addRepuestoAnnotation(value) {
-        if (!value.trim()) return;
-        const canvas = $('photoCanvas');
-        annotations.push({ type: 'repuesto', text: value.trim(), x: canvas.width / 2, y: canvas.height / 2 });
-        redraw();
-        const inp = $('repuestoSelect');
-        if (inp) inp.value = '';
-    }
-    function setStatus(text) { $('photoStatus').textContent = text; }
 
     function render() {
         renderRepuestos();
     }
-    async function refresh() {
-        photos = getPlate() ? await storage.getPhotosByPlate(getPlate()) : [];
-        render();
-        setStatus(getPlate() ? `${photos.length} fotos guardadas localmente para ${getPlate()}.` : 'Vuelve a la cotizacion y registra una placa.');
-    }
-    function renderPhotoCards(grid, photoList, showDelete) {
+
+    function renderPhotoCards(grid, photoList) {
+        grid.innerHTML = '';
         photoList.forEach((photo) => {
             const card = document.createElement('div');
             card.className = 'photo-card';
@@ -101,155 +88,158 @@
             button.className = `photo-thumb${photo.marked ? ' photo-thumb-marked' : ''}`;
             const image = document.createElement('img');
             image.src = URL.createObjectURL(photo.blob);
-            image.alt = photo.marked ? 'Foto marcada' : 'Foto de inspeccion';
+            image.alt = photo.marked ? 'Foto marcada' : 'Foto de inspección';
             button.appendChild(image);
             button.addEventListener('click', () => openEditor(photo));
             card.appendChild(button);
-            if (showDelete) {
-                const delBtn = document.createElement('button');
-                delBtn.type = 'button';
-                delBtn.className = 'photo-delete-btn';
-                delBtn.innerHTML = '&#128465;';
-                delBtn.title = 'Eliminar foto';
-                delBtn.setAttribute('aria-label', 'Eliminar foto');
-                delBtn.addEventListener('click', (event) => { event.stopPropagation(); deletePhoto(photo); });
-                card.appendChild(delBtn);
-            }
+
+            const delBtn = document.createElement('button');
+            delBtn.type = 'button';
+            delBtn.className = 'photo-delete-btn';
+            delBtn.innerHTML = '&#128465;';
+            delBtn.title = 'Eliminar foto';
+            delBtn.addEventListener('click', (event) => {
+                event.stopPropagation();
+                photoPendingDelete = photo;
+                repuestoToDelete = null;
+                $('deleteModal').hidden = false;
+            });
+            card.appendChild(delBtn);
             grid.appendChild(card);
         });
     }
+
     function buildRepuestoCard(item) {
         const isNa = savedNaIds().has(item.id);
         const card = document.createElement('div');
         card.className = 'repuesto-card' + (isNa ? ' repuesto-card-na' : '');
+
         if (isNa) {
-            const label = document.createElement('span');
-            label.className = 'repuesto-na-name';
-            label.textContent = item.descrip || item.id;
-            const tag = document.createElement('span');
-            tag.className = 'repuesto-na-tag';
-            tag.textContent = 'N/A';
-            card.appendChild(label);
-            card.appendChild(tag);
+            card.innerHTML = `
+                <span class="repuesto-na-name">${item.descrip || item.id}</span>
+                <span class="repuesto-na-tag">N/A</span>
+            `;
             card.title = 'Pulsa para quitar el N/A';
             card.setAttribute('role', 'button');
             card.tabIndex = 0;
             card.addEventListener('click', () => toggleNa(item));
-            card.addEventListener('keydown', (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggleNa(item); } });
             return card;
         }
+
         const id = item.id;
         const repPhotos = photos.filter((photo) => String(photo.repuestoId) === String(id));
+
         const name = document.createElement('div');
         name.className = 'repuesto-name';
         name.textContent = item.descrip || item.id;
-        name.title = item.descrip || '';
+
         const row = document.createElement('div');
         row.className = 'repuesto-row';
+
         const media = document.createElement('div');
         media.className = 'repuesto-media';
-        if (repPhotos.length) renderPhotoCards(media, repPhotos);
-        else {
-            const empty = document.createElement('div');
-            empty.className = 'repuesto-empty';
-            empty.textContent = 'Sin foto';
-            media.appendChild(empty);
+        if (repPhotos.length) {
+            renderPhotoCards(media, repPhotos);
+        } else {
+            media.innerHTML = '<div class="repuesto-empty">Sin foto</div>';
         }
+
         const icons = document.createElement('div');
         icons.className = 'repuesto-icons';
-        const inputId = 'repPhoto_' + String(id);
-        const input = document.createElement('input');
-        input.id = inputId;
-        input.className = 'visually-hidden';
-        input.type = 'file';
-        input.accept = 'image/*';
-        input.setAttribute('capture', 'environment');
-        input.multiple = true;
-        input.addEventListener('change', (event) => processFiles(event, false, item));
+
         const cameraBtn = document.createElement('button');
         cameraBtn.type = 'button';
         cameraBtn.className = 'repuesto-icon-btn repuesto-camera-btn';
         cameraBtn.innerHTML = '&#128247;';
-        cameraBtn.title = 'Tomar foto de ' + name.textContent;
-        cameraBtn.setAttribute('aria-label', 'Tomar foto de ' + name.textContent);
-        cameraBtn.addEventListener('click', () => input.click());
+        cameraBtn.title = 'Tomar foto';
+
+        const fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.accept = 'image/*';
+        fileInput.capture = 'environment';
+        fileInput.multiple = true;
+        fileInput.className = 'visually-hidden';
+        fileInput.addEventListener('change', (e) => processFiles(e, false, item));
+
+        cameraBtn.addEventListener('click', () => fileInput.click());
+
         const naBtn = document.createElement('button');
         naBtn.type = 'button';
         naBtn.className = 'repuesto-icon-btn repuesto-na-btn';
         naBtn.textContent = 'N/A';
-        naBtn.title = 'Marcar como no aplica foto';
-        naBtn.setAttribute('aria-pressed', String(savedNaIds().has(id)));
-        naBtn.classList.toggle('is-na', savedNaIds().has(id));
         naBtn.addEventListener('click', () => toggleNa(item));
+
         const trashBtn = document.createElement('button');
         trashBtn.type = 'button';
         trashBtn.className = 'repuesto-icon-btn repuesto-delete-btn';
         trashBtn.innerHTML = '&#128465;';
-        trashBtn.title = 'Eliminar fotos de ' + name.textContent;
-        trashBtn.setAttribute('aria-label', 'Eliminar fotos de ' + name.textContent);
         trashBtn.disabled = !repPhotos.length;
-        trashBtn.addEventListener('click', (event) => { event.stopPropagation(); repuestoToDelete = item; photoPendingDelete = null; $('deleteModal').hidden = false; });
-        icons.appendChild(cameraBtn);
-        icons.appendChild(naBtn);
-        icons.appendChild(trashBtn);
-        row.appendChild(media);
-        row.appendChild(icons);
+        trashBtn.addEventListener('click', () => {
+            repuestoToDelete = item;
+            photoPendingDelete = null;
+            $('deleteModal').hidden = false;
+        });
+
+        icons.append(cameraBtn, naBtn, trashBtn, fileInput);
+        row.append(media, icons);
+
         const counter = document.createElement('div');
         counter.className = 'repuesto-count';
         counter.textContent = `${repPhotos.length} ${repPhotos.length === 1 ? 'foto' : 'fotos'}`;
-        card.appendChild(name);
-        card.appendChild(row);
-        card.appendChild(counter);
+
+        card.append(name, row, counter);
         return card;
     }
+
     function renderRepuestos() {
         const container = $('repuestosList');
         const naWrapper = $('repuestosNa');
         const naList = $('repuestosNaList');
         if (!container) return;
+
         container.innerHTML = '';
         naList.innerHTML = '';
+
         const repuestos = savedRepuestos();
         const naIds = savedNaIds();
         let naCount = 0;
+
         repuestos.forEach((item) => {
             const card = buildRepuestoCard(item);
-            if (naIds.has(item.id)) { naCount++; naList.appendChild(card); }
-            else container.appendChild(card);
+            if (naIds.has(item.id)) {
+                naCount++;
+                naList.appendChild(card);
+            } else {
+                container.appendChild(card);
+            }
         });
+
         naWrapper.hidden = naCount === 0;
         if (!repuestos.length) {
-            const empty = document.createElement('p');
-            empty.className = 'panel-heading-caption';
-            empty.textContent = 'No hay repuestos registrados. Vuelve a Datos y agrega los repuestos.';
-            container.appendChild(empty);
+            container.innerHTML = '<p class="panel-heading-caption">No hay repuestos registrados. Vuelve a Datos y agrega los repuestos.</p>';
         }
     }
-    function toggleNa(item) {
-        const naIds = savedNaIds();
-        if (naIds.has(item.id)) naIds.delete(item.id);
-        else naIds.add(item.id);
-        saveNaIds(naIds);
-        render();
-    }
+
     async function processFiles(event, openDetail, repuesto) {
-        if (!getPlate()) { setStatus('No hay placa activa.'); return; }
+        const plate = getPlate();
+        if (!plate) { setStatus('No hay placa activa.'); return; }
+
         try {
             for (const file of event.target.files) {
-                const compressedBlob = await compress(file, repuesto && repuesto.descrip);
+                const blob = await compress(file, repuesto?.descrip);
                 await storage.savePhoto({
-                    placaVehiculo: getPlate(),
-                    blob: compressedBlob,
+                    placaVehiculo: plate,
+                    blob: blob,
                     marked: false,
                     createdAt: Date.now(),
-                    repuestoId: repuesto && repuesto.id ? String(repuesto.id) : undefined,
-                    repuesto: repuesto && repuesto.descrip ? repuesto.descrip : undefined
+                    repuestoId: repuesto?.id ? String(repuesto.id) : undefined,
+                    repuesto: repuesto?.descrip || undefined
                 });
             }
             await refresh();
             if (openDetail && photos.length) openEditor(photos[photos.length - 1]);
         } catch (error) {
-            setStatus(`No se pudo guardar la foto: ${error.message}`);
+            setStatus(`Error: ${error.message}`);
         }
         event.target.value = '';
     }
@@ -266,6 +256,7 @@
                 const ctx = canvas.getContext('2d');
                 ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
                 URL.revokeObjectURL(url);
+
                 if (label) {
                     const fontSize = Math.max(12, Math.floor(canvas.width / 55));
                     ctx.font = `700 ${fontSize}px Oxanium, sans-serif`;
@@ -284,192 +275,245 @@
                 }
                 canvas.toBlob(resolve, 'image/jpeg', JPEG_QUALITY);
             };
-            image.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Imagen no valida')); };
+            image.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Imagen no válida')); };
             image.src = url;
         });
     }
-    function pointFromEvent(event) { const canvas = $('photoCanvas'); const rect = canvas.getBoundingClientRect(); return { x: (event.clientX - rect.left) * canvas.width / rect.width, y: (event.clientY - rect.top) * canvas.height / rect.height }; }
+
+    // --- Lógica del Editor ---
+
+    function pointFromEvent(event) {
+        const canvas = $('photoCanvas');
+        const rect = canvas.getBoundingClientRect();
+        return {
+            x: (event.clientX - rect.left) * canvas.width / rect.width,
+            y: (event.clientY - rect.top) * canvas.height / rect.height
+        };
+    }
+
+    function redraw() {
+        const canvas = $('photoCanvas');
+        const context = canvas.getContext('2d');
+        if (!sourceImage) return;
+        context.clearRect(0, 0, canvas.width, canvas.height);
+        context.drawImage(sourceImage, 0, 0);
+        drawAnnotations();
+    }
+
     function drawAnnotations() {
-        const context = $('photoCanvas').getContext('2d');
-        annotations.forEach((annotation) => {
-            context.save(); context.strokeStyle = '#ef2222'; context.lineWidth = annotationStrokeWidth(); context.lineCap = 'round'; context.beginPath();
-            if (annotation.type === 'circle') context.arc(annotation.cx, annotation.cy, annotation.radius, 0, Math.PI * 2);
-            else if (annotation.type === 'arrow') { context.moveTo(annotation.x1, annotation.y1); context.lineTo(annotation.x2, annotation.y2); const angle = Math.atan2(annotation.y2 - annotation.y1, annotation.x2 - annotation.x1); const size = 28; context.moveTo(annotation.x2, annotation.y2); context.lineTo(annotation.x2 - size * Math.cos(angle - Math.PI / 6), annotation.y2 - size * Math.sin(angle - Math.PI / 6)); context.moveTo(annotation.x2, annotation.y2); context.lineTo(annotation.x2 - size * Math.cos(angle + Math.PI / 6), annotation.y2 - size * Math.sin(angle + Math.PI / 6)); }
-            context.stroke(); context.restore();
-            if (annotation.type === 'text' || annotation.type === 'repuesto') { const isRep = annotation.type === 'repuesto'; const borderColor = isRep ? '#315ddc' : '#ef2222'; context.save(); const padding = 10; const fontSize = Math.max(12, Math.min(30, Math.max($('photoCanvas').width, $('photoCanvas').height) / 34)); context.font = `700 ${fontSize}px Oxanium, sans-serif`; const textWidth = context.measureText(annotation.text).width; const boxW = textWidth + padding * 2; const boxH = fontSize + padding * 2; const cx = annotation.x; const cy = annotation.y; const x = Math.max(0, Math.min($('photoCanvas').width - boxW, cx - boxW / 2)); const y = Math.max(0, Math.min($('photoCanvas').height - boxH, cy - boxH / 2)); context.fillStyle = '#fff'; context.fillRect(x, y, boxW, boxH); context.fillStyle = isRep ? '#0a1e4f' : '#111827'; context.textBaseline = 'middle'; context.textAlign = 'left'; context.fillText(annotation.text, x + padding, y + boxH / 2); context.strokeStyle = borderColor; context.lineWidth = isRep ? 4 : 3; context.strokeRect(x, y, boxW, boxH); context.restore(); }
+        const canvas = $('photoCanvas');
+        const context = canvas.getContext('2d');
+        annotations.forEach((ann) => {
+            context.save();
+            context.strokeStyle = '#ef2222';
+            context.lineWidth = annotationStrokeWidth();
+            context.lineCap = 'round';
+            context.beginPath();
+
+            if (ann.type === 'circle') {
+                context.arc(ann.cx, ann.cy, ann.radius, 0, Math.PI * 2);
+            } else if (ann.type === 'arrow') {
+                context.moveTo(ann.x1, ann.y1);
+                context.lineTo(ann.x2, ann.y2);
+                const angle = Math.atan2(ann.y2 - ann.y1, ann.x2 - ann.x1);
+                const size = 28;
+                context.moveTo(ann.x2, ann.y2);
+                context.lineTo(ann.x2 - size * Math.cos(angle - Math.PI / 6), ann.y2 - size * Math.sin(angle - Math.PI / 6));
+                context.moveTo(ann.x2, ann.y2);
+                context.lineTo(ann.x2 - size * Math.cos(angle + Math.PI / 6), ann.y2 - size * Math.sin(angle + Math.PI / 6));
+            }
+            context.stroke();
+            context.restore();
+
+            if (ann.type === 'text' || ann.type === 'repuesto') {
+                const isRep = ann.type === 'repuesto';
+                const borderColor = isRep ? '#315ddc' : '#ef2222';
+                context.save();
+                const padding = 10;
+                const fontSize = Math.max(12, Math.min(30, canvas.width / 34));
+                context.font = `700 ${fontSize}px Oxanium, sans-serif`;
+                const textWidth = context.measureText(ann.text).width;
+                const boxW = textWidth + padding * 2;
+                const boxH = fontSize + padding * 2;
+                const x = Math.max(0, Math.min(canvas.width - boxW, ann.x - boxW / 2));
+                const y = Math.max(0, Math.min(canvas.height - boxH, ann.y - boxH / 2));
+
+                context.fillStyle = '#fff';
+                context.fillRect(x, y, boxW, boxH);
+                context.fillStyle = isRep ? '#0a1e4f' : '#111827';
+                context.textBaseline = 'middle';
+                context.fillText(ann.text, x + padding, y + boxH / 2);
+                context.strokeStyle = borderColor;
+                context.lineWidth = isRep ? 4 : 3;
+                context.strokeRect(x, y, boxW, boxH);
+                context.restore();
+            }
         });
     }
-    function annotationAt(point) {
-        for (let index = annotations.length - 1; index >= 0; index -= 1) {
-            const annotation = annotations[index];
-            let hit = false;
-            if (annotation.type === 'circle') hit = Math.abs(distance(point, { x: annotation.cx, y: annotation.cy }) - annotation.radius) < 35;
-            else if (annotation.type === 'arrow') hit = distanceToSegment(point, annotation) < 35;
-            else if (annotation.type === 'text' || annotation.type === 'repuesto') {
-                const context = $('photoCanvas').getContext('2d');
-                const fontSize = Math.max(12, Math.min(30, Math.max($('photoCanvas').width, $('photoCanvas').height) / 34));
-                context.font = `700 ${fontSize}px Oxanium, sans-serif`;
-                const pad = 10;
-                const w = context.measureText(annotation.text).width + pad * 2 + 12;
-                const h = fontSize + pad * 2 + 12;
-                hit = point.x >= annotation.x - w / 2 && point.x <= annotation.x + w / 2 && point.y >= annotation.y - h / 2 && point.y <= annotation.y + h / 2;
-            }
-            if (hit) return annotation;
+
+    function openEditor(photo) {
+        currentPhoto = photo;
+        annotations = [];
+        sourceImage = new Image();
+        sourceImage.onload = () => {
+            const canvas = $('photoCanvas');
+            canvas.width = sourceImage.width;
+            canvas.height = sourceImage.height;
+            redraw();
+        };
+        sourceImage.src = URL.createObjectURL(photo.blob);
+        $('photoEditor').hidden = false;
+
+        // Poblar selector de repuestos cada vez que se abre el editor
+        const repuestoSelect = $('repuestoSelect');
+        if (repuestoSelect) {
+            repuestoSelect.innerHTML = '<option value="">Selecciona un repuesto</option>';
+            savedPartDescriptions().forEach((desc) => {
+                const opt = document.createElement('option');
+                opt.value = desc;
+                opt.textContent = desc;
+                repuestoSelect.appendChild(opt);
+            });
         }
-        return null;
     }
-    function distanceToSegment(point, annotation) { const dx = annotation.x2 - annotation.x1; const dy = annotation.y2 - annotation.y1; const length = dx * dx + dy * dy || 1; const ratio = Math.max(0, Math.min(1, ((point.x - annotation.x1) * dx + (point.y - annotation.y1) * dy) / length)); return distance(point, { x: annotation.x1 + ratio * dx, y: annotation.y1 + ratio * dy }); }
-    function redraw() { const context = $('photoCanvas').getContext('2d'); context.clearRect(0, 0, $('photoCanvas').width, $('photoCanvas').height); context.drawImage(sourceImage, 0, 0); drawAnnotations(); }
-    function startDraw(event) { const point = pointFromEvent(event); movingAnnotation = annotationAt(point); if (movingAnnotation) { if (movingAnnotation.type === 'circle') moveOffset = { x: point.x - movingAnnotation.cx, y: point.y - movingAnnotation.cy }; else if (movingAnnotation.type === 'text' || movingAnnotation.type === 'repuesto') moveOffset = { x: point.x - movingAnnotation.x, y: point.y - movingAnnotation.y }; else moveOffset = { x: point.x - movingAnnotation.x1, y: point.y - movingAnnotation.y1 }; event.preventDefault(); return; } drawing = true; points = [point]; const context = $('photoCanvas').getContext('2d'); context.beginPath(); context.moveTo(point.x, point.y); event.preventDefault(); }
-    function continueDraw(event) { const point = pointFromEvent(event); if (movingAnnotation) { if (movingAnnotation.type === 'circle') { movingAnnotation.cx = point.x - moveOffset.x; movingAnnotation.cy = point.y - moveOffset.y; } else if (movingAnnotation.type === 'text' || movingAnnotation.type === 'repuesto') { movingAnnotation.x = point.x - moveOffset.x; movingAnnotation.y = point.y - moveOffset.y; } else { const dx = point.x - moveOffset.x - movingAnnotation.x1; const dy = point.y - moveOffset.y - movingAnnotation.y1; movingAnnotation.x1 += dx; movingAnnotation.y2 += dx; movingAnnotation.y1 += dy; movingAnnotation.y2 += dy; } redraw(); event.preventDefault(); return; } if (!drawing) return; points.push(point); const context = $('photoCanvas').getContext('2d'); context.lineTo(point.x, point.y); context.stroke(); event.preventDefault(); }
-    function finishDraw() { movingAnnotation = null; moveOffset = null; if (!drawing) return; drawing = false; recognizeGesture(points); redraw(); points = []; }
-    function distance(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
+
+    function addTextAnnotation(value, type = 'text') {
+        if (!value) return;
+        const canvas = $('photoCanvas');
+        annotations.push({
+            type: type,
+            text: value,
+            x: canvas.width / 2,
+            y: canvas.height / 2
+        });
+        redraw();
+    }
+
     function recognizeGesture(path) {
         if (path.length < 2) return;
-        const first = path[0]; const last = path[path.length - 1];
-        const xs = path.map((p) => p.x); const ys = path.map((p) => p.y);
-        const width = Math.max(...xs) - Math.min(...xs); const height = Math.max(...ys) - Math.min(...ys); const size = Math.max(width, height);
-        if (size < 20) return;
-        const endDistance = distance(first, last);
-        const closed = endDistance < size * 0.4 && width > 20 && height > 20;
-        if (annotationMode === 'circle' || (annotationMode === 'auto' && closed)) {
-            annotations.push({ type: 'circle', cx: (Math.min(...xs) + Math.max(...xs)) / 2, cy: (Math.min(...ys) + Math.max(...ys)) / 2, radius: Math.min(width, height) / 2 }); annotationMode = 'auto'; redraw(); return;
-        }
-        annotations.push({ type: 'arrow', x1: first.x, y1: first.y, x2: last.x, y2: last.y }); annotationMode = 'auto'; redraw();
-    }
-    function openEditor(photo) { currentPhoto = photo; annotations = []; sourceImage = new Image(); sourceImage.onload = () => { const canvas = $('photoCanvas'); canvas.width = sourceImage.width; canvas.height = sourceImage.height; redraw(); }; sourceImage.src = URL.createObjectURL(photo.blob); $('photoEditor').hidden = false; if (history.pushState && !editorHistoryGuardAttached) { history.pushState(null, ''); window.addEventListener('popstate', closeEditorOnBack); editorHistoryGuardAttached = true; } }
-    let editorHistoryGuardAttached = false;
-    function closeEditorOnBack(event) { if ($('photoEditor') && !$('photoEditor').hidden) { event.preventDefault(); $('photoEditor').hidden = true; if (editorHistoryGuardAttached) { history.pushState(null, ''); } } }
-    function undoLastStroke() { if (!annotations.length) { if (sourceImage) redraw(); return; } annotations.pop(); if (sourceImage) redraw(); }
-    function deletePhoto(photo) {
-        if (!photo) return;
-        photoPendingDelete = photo;
-        $('deleteModal').hidden = false;
-    }
-    async function confirmDeletePhoto() {
-        const photo = photoPendingDelete;
-        const repuesto = repuestoToDelete;
-        photoPendingDelete = null;
-        repuestoToDelete = null;
-        $('deleteModal').hidden = true;
+        const first = path[0];
+        const last = path[path.length - 1];
+        const xs = path.map(p => p.x);
+        const ys = path.map(p => p.y);
+        const width = Math.max(...xs) - Math.min(...xs);
+        const height = Math.max(...ys) - Math.min(...ys);
+        const dist = Math.hypot(first.x - last.x, first.y - last.y);
 
-        if (repuesto) {
-            let allRecords = [];
-            try { allRecords = await storage.getPhotosByPlate(getPlate()); } catch (error) { setStatus(`No se pudieron cargar las fotos: ${error.message}`); return; }
-            const toRemove = allRecords.filter((photo) => String(photo.repuestoId) === String(repuesto.id));
-            if (toRemove.length) setStatus(`Eliminando ${toRemove.length} foto(s)...`);
-            for (const p of toRemove) {
-                try { await storage.deletePhoto(p.id); } catch (error) { setStatus('No se pudo eliminar una foto: ' + error.message); }
-            }
-            await refresh();
-            return;
-        }
-        if (!photo) return;
-        await storage.deletePhoto(photo.id);
-        await refresh();
-    }
-    async function saveMarked() {
-        const blob = await new Promise((resolve) => $('photoCanvas').toBlob(resolve, 'image/jpeg', JPEG_QUALITY));
-        await storage.savePhoto({ ...currentPhoto, blob, marked: true });
-        $('photoEditor').hidden = true;
-        await refresh();
-    }
-    async function downloadAll() {
-        const records = await storage.getPhotosByPlate(getPlate());
-        if (!records.length) { setStatus('No hay fotos para descargar.'); return; }
-        setStatus(`Preparando ${records.length} fotos para descargar...`);
-        for (const [index, photo] of records.entries()) {
-            const link = document.createElement('a');
-            const objectUrl = URL.createObjectURL(photo.blob);
-            link.href = objectUrl;
-            link.download = `${getPlate()}_${String(index + 1).padStart(2, '0')}${photo.marked ? '_MARCADA' : ''}.jpg`;
-            link.style.display = 'none';
-            document.body.appendChild(link);
-            link.click();
-            link.remove();
-            setTimeout(() => URL.revokeObjectURL(objectUrl), 1500);
-            setStatus(`Descargando foto ${index + 1} de ${records.length}...`);
-            await new Promise((resolve) => setTimeout(resolve, 350));
-        }
-        try {
-            const state = storage.getState();
-            state.photosDownloadedFor = getPlate();
-            state.photosDownloaded = true; // Actualizamos el flag
-            storage.saveState(state);
-            setStatus(`${records.length} fotos enviadas a Descargas.`);
-        } catch (error) { setStatus(`${records.length} fotos descargadas.`); }
-    }
-
-    function getSuzukiMarca() {
-        if (params.get('marca')) return params.get('marca').trim().toUpperCase();
-        const state = storage.getState();
-        return String((state.fields || {}).marca || '').trim().toUpperCase();
-    }
-
-    async function generateSuzukiSpreadsheet(state) {
-        const fields = state.fields || {};
-        const missingCommon = ['placa', 'marca', 'linea', 'modelo', 'color', 'tipoCliente'].filter((field) => !String(fields[field] || '').trim());
-        if (missingCommon.length) { alert(`Faltan datos obligatorios: ${missingCommon.map((f) => f.toUpperCase()).join(', ')}`); return; }
-        const missingSuzuki = [];
-        if (!String(fields.cilindraje || '').trim()) missingSuzuki.push('cilindraje');
-        if (!String(fields.vin || '').trim()) missingSuzuki.push('vin');
-        if (missingSuzuki.length) { alert(`Para Suzuki faltan datos: ${missingSuzuki.map((f) => f.toUpperCase()).join(', ')}`); return; }
-        try {
-            const workbook = new ExcelJS.Workbook();
-            const response = await fetch('./template2.xlsx');
-            const arrayBuffer = await response.arrayBuffer();
-            const loadedWorkbook = await workbook.xlsx.load(arrayBuffer);
-            const worksheet = loadedWorkbook.getWorksheet(1);
-            worksheet.getCell('B6').value = (fields.placa || '').toUpperCase();
-            worksheet.getCell('B3').value = (fields.linea || '').toUpperCase();
-            worksheet.getCell('B2').value = fields.modelo || '';
-            worksheet.getCell('B4').value = fields.cilindraje || '';
-            worksheet.getCell('B7').value = (fields.tipoCliente || '').toUpperCase();
-            worksheet.getCell('B5').value = (fields.vin || '').toUpperCase();
-            let startRow = 14;
-            const items = Array.isArray(state.quoteItems) ? state.quoteItems : [];
-            items.forEach((item) => {
-                const estado = String(item.estado || '').trim().toUpperCase();
-                if (estado !== 'CAMBIO') return;
-                worksheet.getCell(`A${startRow}`).value = item.descrip;
-                worksheet.getCell(`B${startRow}`).value = item.cant;
-                startRow++;
+        if (dist < Math.max(width, height) * 0.4 && width > 20 && height > 20) {
+            annotations.push({
+                type: 'circle',
+                cx: (Math.min(...xs) + Math.max(...xs)) / 2,
+                cy: (Math.min(...ys) + Math.max(...ys)) / 2,
+                radius: Math.min(width, height) / 2
             });
-            const placa = fields.placa || 'cotizacion';
-            const buffer = await workbook.xlsx.writeBuffer();
-            const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `${placa} Cotizacion Repuestos Suzuki.xlsx`.toUpperCase();
-            a.click();
-            URL.revokeObjectURL(url);
-        } catch (error) { }
-    }
-
-    function setupSuzukiExport() {
-        const button = $('createSuzukiBtn');
-        if (!button) return;
-        const marca = getSuzukiMarca().toLowerCase();
-        const isEligible = marca === 'suzuki' || marca === 'citroen';
-        button.hidden = !isEligible;
-        if (!isEligible) return;
-        button.addEventListener('click', () => generateSuzukiSpreadsheet(storage.getState()));
+        } else {
+            annotations.push({
+                type: 'arrow',
+                x1: first.x, y1: first.y,
+                x2: last.x, y2: last.y
+            });
+        }
     }
 
     async function init() {
-        setupSuzukiExport();
-        $('plateLabel').textContent = getPlate() ? `PLACA: ${getPlate()}` : 'Sin placa seleccionada';
-        try {
-            await storage.openDB();
+        const plate = getPlate();
+        const plateLabel = $('plateLabel');
+        if (plateLabel) plateLabel.textContent = plate ? `PLACA: ${plate}` : 'Sin placa';
+
+        await storage.openDB();
+        await refresh();
+
+        // Botones de acción principal
+        $('downloadPhotosBtn')?.addEventListener('click', downloadAll);
+
+        // Modal de eliminación
+        $('cancelDeleteBtn')?.addEventListener('click', () => { $('deleteModal').hidden = true; });
+        $('confirmDeleteBtn')?.addEventListener('click', async () => {
+            if (repuestoToDelete) {
+                const all = await storage.getPhotosByPlate(getPlate());
+                const toDelete = all.filter(p => String(p.repuestoId) === String(repuestoToDelete.id));
+                for (const p of toDelete) await storage.deletePhoto(p.id);
+            } else if (photoPendingDelete) {
+                await storage.deletePhoto(photoPendingDelete.id);
+            }
+            $('deleteModal').hidden = true;
             await refresh();
-        } catch (error) {
-            setStatus('IndexedDB no esta disponible en este navegador.');
-            return;
+        });
+
+        // Editor
+        $('cancelEditBtn')?.addEventListener('click', () => { $('photoEditor').hidden = true; });
+        $('clearDrawingBtn')?.addEventListener('click', () => { annotations.pop(); redraw(); });
+        $('saveMarkedBtn')?.addEventListener('click', async () => {
+            const blob = await new Promise(res => $('photoCanvas').toBlob(res, 'image/jpeg', JPEG_QUALITY));
+            await storage.savePhoto({ ...currentPhoto, blob, marked: true });
+            $('photoEditor').hidden = true;
+            await refresh();
+        });
+
+        $('damageSelect')?.addEventListener('change', (e) => {
+            if (e.target.value) {
+                addTextAnnotation(e.target.value, 'text');
+                e.target.value = '';
+            }
+        });
+
+        $('repuestoSelect')?.addEventListener('change', (e) => {
+            if (e.target.value) {
+                addTextAnnotation(e.target.value, 'repuesto');
+                e.target.value = '';
+            }
+        });
+
+        // Eventos de dibujo
+        const canvas = $('photoCanvas');
+        if (canvas) {
+            canvas.addEventListener('pointerdown', (e) => {
+                drawing = true;
+                points = [pointFromEvent(e)];
+            });
+            canvas.addEventListener('pointermove', (e) => {
+                if (!drawing) return;
+                const p = pointFromEvent(e);
+                points.push(p);
+                const ctx = canvas.getContext('2d');
+                ctx.strokeStyle = '#ef2222';
+                ctx.lineWidth = annotationStrokeWidth();
+                ctx.lineCap = 'round';
+                ctx.lineTo(p.x, p.y);
+                ctx.stroke();
+            });
+            canvas.addEventListener('pointerup', () => {
+                if (!drawing) return;
+                drawing = false;
+                recognizeGesture(points);
+                redraw();
+            });
         }
-        $('photoInput').addEventListener('change', (event) => processFiles(event, false)); $('detailPhotoInput').addEventListener('change', (event) => processFiles(event, true)); $('downloadPhotosBtn').addEventListener('click', downloadAll); $('cancelDeleteBtn').addEventListener('click', () => { photoPendingDelete = null; repuestoToDelete = null; $('deleteModal').hidden = true; }); $('confirmDeleteBtn').addEventListener('click', confirmDeletePhoto); $('cancelEditBtn').addEventListener('click', () => { $('photoEditor').hidden = true; }); $('clearDrawingBtn').addEventListener('click', undoLastStroke); $('saveMarkedBtn').addEventListener('click', saveMarked);
-        const damageSelect = $('damageSelect'); if (damageSelect) damageSelect.addEventListener('change', () => { if (damageSelect.value) addTextAnnotation(damageSelect.value); }); const repuestoSelect = $('repuestoSelect'); if (repuestoSelect) { savedPartDescriptions().forEach((description) => { const opt = document.createElement('option'); opt.value = description; opt.textContent = description; repuestoSelect.appendChild(opt); }); repuestoSelect.addEventListener('change', () => { if (repuestoSelect.value) addRepuestoAnnotation(repuestoSelect.value); }); } const canvas = $('photoCanvas'); canvas.addEventListener('pointerdown', startDraw); canvas.addEventListener('pointermove', continueDraw); canvas.addEventListener('pointerup', finishDraw); canvas.addEventListener('pointercancel', finishDraw); const context = canvas.getContext('2d'); context.strokeStyle = '#ef2222'; context.lineWidth = annotationStrokeWidth(); context.lineCap = 'round';
     }
-    window.descargarFotosMasivas = downloadAll;
+
+    async function downloadAll() {
+        const plate = getPlate();
+        const records = await storage.getPhotosByPlate(plate);
+        if (!records.length) { setStatus('No hay fotos para descargar.'); return; }
+
+        setStatus(`Preparando ${records.length} fotos...`);
+        for (const [index, photo] of records.entries()) {
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(photo.blob);
+            link.href = url;
+            link.download = `${plate}_${String(index + 1).padStart(2, '0')}${photo.marked ? '_MARCADA' : ''}.jpg`;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 1500);
+            await new Promise(res => setTimeout(res, 400));
+        }
+
+        const state = storage.getState();
+        state.photosDownloaded = true;
+        storage.saveState(state);
+        setStatus('Descarga completada.');
+    }
+
     document.addEventListener('DOMContentLoaded', init);
 })();

@@ -13,12 +13,13 @@
     let drawing = false;
     let points = [];
     let annotations = [];
-    let movingAnnotation;
-    let moveOffset;
-    let annotationMode = 'auto';
-    let photoPendingDelete;
+    let photoPendingDelete = null;
 
-    const annotationStrokeWidth = () => Math.max(12, Math.min(32, Math.max($('photoCanvas').width, $('photoCanvas').height) / 140));
+    const annotationStrokeWidth = () => {
+        const canvas = $('photoCanvas');
+        if (!canvas) return 12;
+        return Math.max(12, Math.min(32, Math.max(canvas.width, canvas.height) / 140));
+    };
 
     function getPlate() {
         return storage.getPlate();
@@ -33,7 +34,6 @@
         const plate = getPlate();
         if (plate) {
             const allPhotos = await storage.getPhotosByPlate(plate);
-            // Filtramos solo las fotos que NO tienen repuestoId (fotos generales)
             photos = allPhotos.filter(p => !p.repuestoId);
         } else {
             photos = [];
@@ -84,18 +84,21 @@
         const plate = getPlate();
         if (!plate) return;
 
-        for (const file of event.target.files) {
-            const blob = await compress(file);
-            await storage.savePhoto({
-                placaVehiculo: plate,
-                blob: blob,
-                marked: false,
-                createdAt: Date.now()
-                // Sin repuestoId para que sea general
-            });
+        try {
+            for (const file of event.target.files) {
+                const blob = await compress(file);
+                await storage.savePhoto({
+                    placaVehiculo: plate,
+                    blob: blob,
+                    marked: false,
+                    createdAt: Date.now()
+                });
+            }
+            await refresh();
+            if (openDetail && photos.length) openEditor(photos[photos.length - 1]);
+        } catch (error) {
+            setStatus(`Error: ${error.message}`);
         }
-        await refresh();
-        if (openDetail && photos.length) openEditor(photos[photos.length - 1]);
         event.target.value = '';
     }
 
@@ -113,27 +116,43 @@
                 URL.revokeObjectURL(url);
                 canvas.toBlob(resolve, 'image/jpeg', JPEG_QUALITY);
             };
+            image.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Imagen no válida')); };
             image.src = url;
         });
     }
 
-    // --- Lógica del Editor (Canvas) ---
-    // Copiada y simplificada de fotos.js
+    function pointFromEvent(event) {
+        const canvas = $('photoCanvas');
+        const rect = canvas.getBoundingClientRect();
+        return {
+            x: (event.clientX - rect.left) * canvas.width / rect.width,
+            y: (event.clientY - rect.top) * canvas.height / rect.height
+        };
+    }
+
     function redraw() {
         const canvas = $('photoCanvas');
         const context = canvas.getContext('2d');
+        if (!sourceImage) return;
         context.clearRect(0, 0, canvas.width, canvas.height);
         context.drawImage(sourceImage, 0, 0);
+        drawAnnotations();
+    }
 
+    function drawAnnotations() {
+        const canvas = $('photoCanvas');
+        const context = canvas.getContext('2d');
         annotations.forEach(ann => {
             context.save();
             context.strokeStyle = '#ef2222';
             context.lineWidth = annotationStrokeWidth();
             context.lineCap = 'round';
             context.beginPath();
-            if (ann.type === 'circle') context.arc(ann.cx, ann.cy, ann.radius, 0, Math.PI * 2);
-            else if (ann.type === 'arrow') {
-                context.moveTo(ann.x1, ann.y1); context.lineTo(ann.x2, ann.y2);
+            if (ann.type === 'circle') {
+                context.arc(ann.cx, ann.cy, ann.radius, 0, Math.PI * 2);
+            } else if (ann.type === 'arrow') {
+                context.moveTo(ann.x1, ann.y1);
+                context.lineTo(ann.x2, ann.y2);
                 const angle = Math.atan2(ann.y2 - ann.y1, ann.x2 - ann.x1);
                 const size = 28;
                 context.moveTo(ann.x2, ann.y2);
@@ -171,9 +190,9 @@
             canvas.width = sourceImage.width;
             canvas.height = sourceImage.height;
             redraw();
-            $('photoEditor').hidden = false;
         };
         sourceImage.src = URL.createObjectURL(photo.blob);
+        $('photoEditor').hidden = false;
     }
 
     function addTextAnnotation(val) {
@@ -181,17 +200,16 @@
         const canvas = $('photoCanvas');
         annotations.push({ type: 'text', text: val, x: canvas.width / 2, y: canvas.height / 2 });
         redraw();
-        $('damageSelect').value = '';
     }
 
-    // Eventos de dibujo y gestión
     async function init() {
         const plate = getPlate();
         $('plateLabel').textContent = plate ? `PLACA: ${plate}` : 'Sin placa';
 
         $('photoInput').addEventListener('change', (e) => processFiles(e, false));
         $('detailPhotoInput').addEventListener('change', (e) => processFiles(e, true));
-        $('cancelEditBtn').addEventListener('click', () => $('photoEditor').hidden = true);
+
+        $('cancelEditBtn').addEventListener('click', () => { $('photoEditor').hidden = true; });
         $('clearDrawingBtn').addEventListener('click', () => { annotations.pop(); redraw(); });
         $('saveMarkedBtn').addEventListener('click', async () => {
             const blob = await new Promise(res => $('photoCanvas').toBlob(res, 'image/jpeg', JPEG_QUALITY));
@@ -208,42 +226,46 @@
             await refresh();
         });
 
-        $('damageSelect').addEventListener('change', (e) => addTextAnnotation(e.target.value));
+        $('damageSelect').addEventListener('change', (e) => {
+            if (e.target.value) {
+                addTextAnnotation(e.target.value);
+                e.target.value = '';
+            }
+        });
 
         const canvas = $('photoCanvas');
-        const getPoint = (e) => {
-            const r = canvas.getBoundingClientRect();
-            return { x: (e.clientX - r.left) * canvas.width / r.width, y: (e.clientY - r.top) * canvas.height / r.height };
-        };
-
-        canvas.addEventListener('pointerdown', (e) => {
-            const p = getPoint(e);
-            drawing = true;
-            points = [p];
-        });
-        canvas.addEventListener('pointermove', (e) => {
-            if (!drawing) return;
-            const p = getPoint(e);
-            points.push(p);
-            const ctx = canvas.getContext('2d');
-            ctx.lineTo(p.x, p.y);
-            ctx.stroke();
-        });
-        canvas.addEventListener('pointerup', () => {
-            if (!drawing) return;
-            drawing = false;
-            // Reconocimiento simple de gesto
-            const first = points[0]; const last = points[points.length-1];
-            const dist = Math.hypot(first.x - last.x, first.y - last.y);
-            const xs = points.map(p => p.x); const ys = points.map(p => p.y);
-            const w = Math.max(...xs) - Math.min(...xs); const h = Math.max(...ys) - Math.min(...ys);
-            if (dist < Math.max(w,h) * 0.4) {
-                annotations.push({ type: 'circle', cx: (Math.min(...xs)+Math.max(...xs))/2, cy: (Math.min(...ys)+Math.max(...ys))/2, radius: Math.min(w,h)/2 });
-            } else {
-                annotations.push({ type: 'arrow', x1: first.x, y1: first.y, x2: last.x, y2: last.y });
-            }
-            redraw();
-        });
+        if (canvas) {
+            canvas.addEventListener('pointerdown', (e) => {
+                drawing = true;
+                points = [pointFromEvent(e)];
+            });
+            canvas.addEventListener('pointermove', (e) => {
+                if (!drawing) return;
+                const p = pointFromEvent(e);
+                points.push(p);
+                const ctx = canvas.getContext('2d');
+                ctx.strokeStyle = '#ef2222';
+                ctx.lineWidth = annotationStrokeWidth();
+                ctx.lineCap = 'round';
+                ctx.lineTo(p.x, p.y);
+                ctx.stroke();
+            });
+            canvas.addEventListener('pointerup', () => {
+                if (!drawing) return;
+                drawing = false;
+                // Reconocimiento simple de gesto
+                const first = points[0]; const last = points[points.length-1];
+                const dist = Math.hypot(first.x - last.x, first.y - last.y);
+                const xs = points.map(p => p.x); const ys = points.map(p => p.y);
+                const w = Math.max(...xs) - Math.min(...xs); const h = Math.max(...ys) - Math.min(...ys);
+                if (dist < Math.max(w,h) * 0.4 && w > 20 && h > 20) {
+                    annotations.push({ type: 'circle', cx: (Math.min(...xs)+Math.max(...xs))/2, cy: (Math.min(...ys)+Math.max(...ys))/2, radius: Math.min(w,h)/2 });
+                } else if (Math.max(w,h) > 20) {
+                    annotations.push({ type: 'arrow', x1: first.x, y1: first.y, x2: last.x, y2: last.y });
+                }
+                redraw();
+            });
+        }
 
         await storage.openDB();
         await refresh();
