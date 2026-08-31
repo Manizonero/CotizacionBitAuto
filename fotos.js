@@ -234,8 +234,59 @@
     }
     async function processFiles(event, openDetail, repuesto) {
         if (!getPlate()) { setStatus('No hay placa activa.'); return; }
-        try { for (const file of event.target.files) await storage.savePhoto({ placaVehiculo: getPlate(), blob: await compress(file, repuesto && repuesto.descrip), marked: false, createdAt: Date.now(), repuestoId: repuesto && repuesto.id ? String(repuesto.id) : undefined, repuesto: repuesto && repuesto.descrip ? repuesto.descrip : undefined }); await refresh(); if (openDetail && photos.length) openEditor(photos[photos.length - 1]); } catch (error) { setStatus(`No se pudo guardar la foto: ${error.message}`); }
+        try {
+            for (const file of event.target.files) {
+                const compressedBlob = await compress(file, repuesto && repuesto.descrip);
+                await storage.savePhoto({
+                    placaVehiculo: getPlate(),
+                    blob: compressedBlob,
+                    marked: false,
+                    createdAt: Date.now(),
+                    repuestoId: repuesto && repuesto.id ? String(repuesto.id) : undefined,
+                    repuesto: repuesto && repuesto.descrip ? repuesto.descrip : undefined
+                });
+            }
+            await refresh();
+            if (openDetail && photos.length) openEditor(photos[photos.length - 1]);
+        } catch (error) {
+            setStatus(`No se pudo guardar la foto: ${error.message}`);
+        }
         event.target.value = '';
+    }
+
+    function compress(file, label) {
+        return new Promise((resolve, reject) => {
+            const image = new Image();
+            const url = URL.createObjectURL(file);
+            image.onload = () => {
+                const scale = Math.min(1, MAX_WIDTH / image.width, MAX_HEIGHT / image.height);
+                const canvas = document.createElement('canvas');
+                canvas.width = Math.max(1, Math.round(image.width * scale));
+                canvas.height = Math.max(1, Math.round(image.height * scale));
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+                URL.revokeObjectURL(url);
+                if (label) {
+                    const fontSize = Math.max(12, Math.floor(canvas.width / 55));
+                    ctx.font = `700 ${fontSize}px Oxanium, sans-serif`;
+                    const textWidth = ctx.measureText(label).width;
+                    const pad = Math.max(4, Math.floor(canvas.width * 0.012));
+                    const lineHeight = Math.ceil(fontSize * 1.35);
+                    const boxX = canvas.width - textWidth - pad * 2;
+                    const boxW = textWidth + pad * 2;
+                    const boxH = lineHeight + pad * 2;
+                    const boxY = canvas.height - boxH;
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+                    ctx.fillRect(boxX, boxY, boxW, boxH);
+                    ctx.fillStyle = '#111827';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(label, boxX + pad, boxY + pad + lineHeight / 2);
+                }
+                canvas.toBlob(resolve, 'image/jpeg', JPEG_QUALITY);
+            };
+            image.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Imagen no valida')); };
+            image.src = url;
+        });
     }
     function pointFromEvent(event) { const canvas = $('photoCanvas'); const rect = canvas.getBoundingClientRect(); return { x: (event.clientX - rect.left) * canvas.width / rect.width, y: (event.clientY - rect.top) * canvas.height / rect.height }; }
     function drawAnnotations() {
