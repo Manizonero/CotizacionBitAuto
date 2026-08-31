@@ -36,31 +36,27 @@
         const empty = $('verifEmpty');
         const count = $('verifCount');
         list.innerHTML = '';
+
         const repuestos = getRepuestos();
         const verified = getVerified();
-        const visible = repuestos.filter((item) => item && !verified.has(item.id));
         const total = repuestos.length;
+        const confirmedCount = verified.size;
 
-        count.textContent = `${visible.length} de ${total}`;
+        count.textContent = `${confirmedCount} de ${total}`;
         empty.hidden = total > 0;
 
         if (!total) return;
-        if (!visible.length) {
-            const done = document.createElement('p');
-            done.className = 'panel-caption';
-            done.textContent = 'Todos los repuestos fueron verificados.';
-            list.appendChild(done);
-            return;
-        }
 
-        visible.forEach((item) => {
+        repuestos.forEach((item) => {
+            const isConfirmed = verified.has(item.id);
             const row = document.createElement('div');
-            row.className = 'verif-item';
+            row.className = 'verif-item' + (isConfirmed ? ' checked' : '');
 
             const label = document.createElement('label');
             const check = document.createElement('input');
             check.type = 'checkbox';
             check.className = 'verif-check';
+            check.checked = isConfirmed;
 
             const name = document.createElement('span');
             name.textContent = item.descrip || item.id;
@@ -71,14 +67,22 @@
             const doneTag = document.createElement('span');
             doneTag.className = 'verif-done';
             doneTag.textContent = 'Confirmado';
-            doneTag.style.display = 'none';
+            doneTag.style.display = isConfirmed ? 'block' : 'none';
 
             check.addEventListener('change', () => {
                 const verifiedSet = getVerified();
-                if (check.checked) verifiedSet.add(item.id);
-                else verifiedSet.delete(item.id);
+                if (check.checked) {
+                    verifiedSet.add(item.id);
+                    row.classList.add('checked');
+                    doneTag.style.display = 'block';
+                } else {
+                    verifiedSet.delete(item.id);
+                    row.classList.remove('checked');
+                    doneTag.style.display = 'none';
+                }
                 setVerified(verifiedSet);
-                render();
+                // Actualizar contador sin redibujar todo para mejor fluidez
+                count.textContent = `${verifiedSet.size} de ${total}`;
             });
 
             row.appendChild(label);
