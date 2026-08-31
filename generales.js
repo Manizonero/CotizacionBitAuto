@@ -13,6 +13,8 @@
     let drawing = false;
     let points = [];
     let annotations = [];
+    let movingAnnotation = null;
+    let moveOffset = null;
     let photoPendingDelete = null;
 
     const annotationStrokeWidth = () => {
@@ -20,6 +22,16 @@
         if (!canvas) return 12;
         return Math.max(12, Math.min(32, Math.max(canvas.width, canvas.height) / 140));
     };
+
+    const distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+
+    function distanceToSegment(p, ann) {
+        const dx = ann.x2 - ann.x1;
+        const dy = ann.y2 - ann.y1;
+        const lengthSq = dx * dx + dy * dy || 1;
+        const t = Math.max(0, Math.min(1, ((p.x - ann.x1) * dx + (p.y - ann.y1) * dy) / lengthSq));
+        return distance(p, { x: ann.x1 + t * dx, y: ann.y1 + t * dy });
+    }
 
     function getPlate() {
         return storage.getPlate();
@@ -77,7 +89,8 @@
             grid.appendChild(card);
         });
 
-        $('photoCount').textContent = `${photos.length} ${photos.length === 1 ? 'foto' : 'fotos'}`;
+        const countEl = $('photoCount');
+        if (countEl) countEl.textContent = `${photos.length} ${photos.length === 1 ? 'foto' : 'fotos'}`;
     }
 
     async function processFiles(event, openDetail) {
@@ -119,6 +132,29 @@
             image.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Imagen no válida')); };
             image.src = url;
         });
+    }
+
+    // --- Lógica del Editor ---
+
+    function annotationAt(point) {
+        const canvas = $('photoCanvas');
+        const context = canvas.getContext('2d');
+        for (let i = annotations.length - 1; i >= 0; i--) {
+            const ann = annotations[i];
+            let hit = false;
+            if (ann.type === 'circle') hit = Math.abs(distance(point, { x: ann.cx, y: ann.cy }) - ann.radius) < 35;
+            else if (ann.type === 'arrow') hit = distanceToSegment(point, ann) < 35;
+            else if (ann.type === 'text') {
+                const fontSize = Math.max(12, Math.min(30, canvas.width / 34));
+                context.font = `700 ${fontSize}px Oxanium, sans-serif`;
+                const pad = 10;
+                const w = context.measureText(ann.text).width + pad * 2;
+                const h = fontSize + pad * 2;
+                hit = point.x >= ann.x - w/2 && point.x <= ann.x + w/2 && point.y >= ann.y - h/2 && point.y <= ann.y + h/2;
+            }
+            if (hit) return ann;
+        }
+        return null;
     }
 
     function pointFromEvent(event) {
@@ -202,9 +238,38 @@
         redraw();
     }
 
+    function recognizeGesture(path) {
+        if (path.length < 2) return;
+        const first = path[0];
+        const last = path[path.length - 1];
+        const xs = path.map(p => p.x);
+        const ys = path.map(p => p.y);
+        const width = Math.max(...xs) - Math.min(...xs);
+        const height = Math.max(...ys) - Math.min(...ys);
+        const dist = Math.hypot(first.x - last.x, first.y - last.y);
+
+        if (dist < Math.max(width, height) * 0.4 && width > 20 && height > 20) {
+            annotations.push({
+                type: 'circle',
+                cx: (Math.min(...xs) + Math.max(...xs)) / 2,
+                cy: (Math.min(...ys) + Math.max(...ys)) / 2,
+                radius: Math.min(width, height) / 2
+            });
+        } else {
+            annotations.push({
+                type: 'arrow',
+                x1: first.x, y1: first.y,
+                x2: last.x, y2: last.y
+            });
+        }
+    }
+
     async function init() {
         const plate = getPlate();
         $('plateLabel').textContent = plate ? `PLACA: ${plate}` : 'Sin placa';
+
+        await storage.openDB();
+        await refresh();
 
         $('photoInput').addEventListener('change', (e) => processFiles(e, false));
         $('detailPhotoInput').addEventListener('change', (e) => processFiles(e, true));
@@ -236,12 +301,41 @@
         const canvas = $('photoCanvas');
         if (canvas) {
             canvas.addEventListener('pointerdown', (e) => {
-                drawing = true;
-                points = [pointFromEvent(e)];
-            });
-            canvas.addEventListener('pointermove', (e) => {
-                if (!drawing) return;
                 const p = pointFromEvent(e);
+                movingAnnotation = annotationAt(p);
+                if (movingAnnotation) {
+                    if (movingAnnotation.type === 'circle') {
+                        moveOffset = { x: p.x - movingAnnotation.cx, y: p.y - movingAnnotation.cy };
+                    } else if (movingAnnotation.type === 'text') {
+                        moveOffset = { x: p.x - movingAnnotation.x, y: p.y - movingAnnotation.y };
+                    } else {
+                        moveOffset = { x: p.x - movingAnnotation.x1, y: p.y - movingAnnotation.y1 };
+                    }
+                    return;
+                }
+                drawing = true;
+                points = [p];
+            });
+
+            canvas.addEventListener('pointermove', (e) => {
+                const p = pointFromEvent(e);
+                if (movingAnnotation) {
+                    if (movingAnnotation.type === 'circle') {
+                        movingAnnotation.cx = p.x - moveOffset.x;
+                        movingAnnotation.cy = p.y - moveOffset.y;
+                    } else if (movingAnnotation.type === 'text') {
+                        movingAnnotation.x = p.x - moveOffset.x;
+                        movingAnnotation.y = p.y - moveOffset.y;
+                    } else {
+                        const dx = p.x - moveOffset.x - movingAnnotation.x1;
+                        const dy = p.y - moveOffset.y - movingAnnotation.y1;
+                        movingAnnotation.x1 += dx; movingAnnotation.x2 += dx;
+                        movingAnnotation.y1 += dy; movingAnnotation.y2 += dy;
+                    }
+                    redraw();
+                    return;
+                }
+                if (!drawing) return;
                 points.push(p);
                 const ctx = canvas.getContext('2d');
                 ctx.strokeStyle = '#ef2222';
@@ -250,25 +344,18 @@
                 ctx.lineTo(p.x, p.y);
                 ctx.stroke();
             });
+
             canvas.addEventListener('pointerup', () => {
+                if (movingAnnotation) {
+                    movingAnnotation = null;
+                    return;
+                }
                 if (!drawing) return;
                 drawing = false;
-                // Reconocimiento simple de gesto
-                const first = points[0]; const last = points[points.length-1];
-                const dist = Math.hypot(first.x - last.x, first.y - last.y);
-                const xs = points.map(p => p.x); const ys = points.map(p => p.y);
-                const w = Math.max(...xs) - Math.min(...xs); const h = Math.max(...ys) - Math.min(...ys);
-                if (dist < Math.max(w,h) * 0.4 && w > 20 && h > 20) {
-                    annotations.push({ type: 'circle', cx: (Math.min(...xs)+Math.max(...xs))/2, cy: (Math.min(...ys)+Math.max(...ys))/2, radius: Math.min(w,h)/2 });
-                } else if (Math.max(w,h) > 20) {
-                    annotations.push({ type: 'arrow', x1: first.x, y1: first.y, x2: last.x, y2: last.y });
-                }
+                recognizeGesture(points);
                 redraw();
             });
         }
-
-        await storage.openDB();
-        await refresh();
     }
 
     document.addEventListener('DOMContentLoaded', init);

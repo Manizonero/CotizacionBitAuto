@@ -25,6 +25,16 @@
         return Math.max(12, Math.min(32, Math.max(canvas.width, canvas.height) / 140));
     };
 
+    const distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+
+    function distanceToSegment(p, ann) {
+        const dx = ann.x2 - ann.x1;
+        const dy = ann.y2 - ann.y1;
+        const lengthSq = dx * dx + dy * dy || 1;
+        const t = Math.max(0, Math.min(1, ((p.x - ann.x1) * dx + (p.y - ann.y1) * dy) / lengthSq));
+        return distance(p, { x: ann.x1 + t * dx, y: ann.y1 + t * dy });
+    }
+
     function getPlate() {
         if (params.get('placa')) return params.get('placa').trim().toUpperCase();
         return storage.getPlate();
@@ -282,6 +292,27 @@
 
     // --- Lógica del Editor ---
 
+    function annotationAt(point) {
+        const canvas = $('photoCanvas');
+        const context = canvas.getContext('2d');
+        for (let i = annotations.length - 1; i >= 0; i--) {
+            const ann = annotations[i];
+            let hit = false;
+            if (ann.type === 'circle') hit = Math.abs(distance(point, { x: ann.cx, y: ann.cy }) - ann.radius) < 35;
+            else if (ann.type === 'arrow') hit = distanceToSegment(point, ann) < 35;
+            else if (ann.type === 'text' || ann.type === 'repuesto') {
+                const fontSize = Math.max(12, Math.min(30, canvas.width / 34));
+                context.font = `700 ${fontSize}px Oxanium, sans-serif`;
+                const pad = 10;
+                const w = context.measureText(ann.text).width + pad * 2;
+                const h = fontSize + pad * 2;
+                hit = point.x >= ann.x - w/2 && point.x <= ann.x + w/2 && point.y >= ann.y - h/2 && point.y <= ann.y + h/2;
+            }
+            if (hit) return ann;
+        }
+        return null;
+    }
+
     function pointFromEvent(event) {
         const canvas = $('photoCanvas');
         const rect = canvas.getBoundingClientRect();
@@ -364,7 +395,6 @@
         sourceImage.src = URL.createObjectURL(photo.blob);
         $('photoEditor').hidden = false;
 
-        // Poblar selector de repuestos cada vez que se abre el editor
         const repuestoSelect = $('repuestoSelect');
         if (repuestoSelect) {
             repuestoSelect.innerHTML = '<option value="">Selecciona un repuesto</option>';
@@ -423,10 +453,8 @@
         await storage.openDB();
         await refresh();
 
-        // Botones de acción principal
         $('downloadPhotosBtn')?.addEventListener('click', downloadAll);
 
-        // Modal de eliminación
         $('cancelDeleteBtn')?.addEventListener('click', () => { $('deleteModal').hidden = true; });
         $('confirmDeleteBtn')?.addEventListener('click', async () => {
             if (repuestoToDelete) {
@@ -440,7 +468,6 @@
             await refresh();
         });
 
-        // Editor
         $('cancelEditBtn')?.addEventListener('click', () => { $('photoEditor').hidden = true; });
         $('clearDrawingBtn')?.addEventListener('click', () => { annotations.pop(); redraw(); });
         $('saveMarkedBtn')?.addEventListener('click', async () => {
@@ -464,16 +491,44 @@
             }
         });
 
-        // Eventos de dibujo
         const canvas = $('photoCanvas');
         if (canvas) {
             canvas.addEventListener('pointerdown', (e) => {
-                drawing = true;
-                points = [pointFromEvent(e)];
-            });
-            canvas.addEventListener('pointermove', (e) => {
-                if (!drawing) return;
                 const p = pointFromEvent(e);
+                movingAnnotation = annotationAt(p);
+                if (movingAnnotation) {
+                    if (movingAnnotation.type === 'circle') {
+                        moveOffset = { x: p.x - movingAnnotation.cx, y: p.y - movingAnnotation.cy };
+                    } else if (movingAnnotation.type === 'text' || movingAnnotation.type === 'repuesto') {
+                        moveOffset = { x: p.x - movingAnnotation.x, y: p.y - movingAnnotation.y };
+                    } else {
+                        moveOffset = { x: p.x - movingAnnotation.x1, y: p.y - movingAnnotation.y1 };
+                    }
+                    return;
+                }
+                drawing = true;
+                points = [p];
+            });
+
+            canvas.addEventListener('pointermove', (e) => {
+                const p = pointFromEvent(e);
+                if (movingAnnotation) {
+                    if (movingAnnotation.type === 'circle') {
+                        movingAnnotation.cx = p.x - moveOffset.x;
+                        movingAnnotation.cy = p.y - moveOffset.y;
+                    } else if (movingAnnotation.type === 'text' || movingAnnotation.type === 'repuesto') {
+                        movingAnnotation.x = p.x - moveOffset.x;
+                        movingAnnotation.y = p.y - moveOffset.y;
+                    } else {
+                        const dx = p.x - moveOffset.x - movingAnnotation.x1;
+                        const dy = p.y - moveOffset.y - movingAnnotation.y1;
+                        movingAnnotation.x1 += dx; movingAnnotation.x2 += dx;
+                        movingAnnotation.y1 += dy; movingAnnotation.y2 += dy;
+                    }
+                    redraw();
+                    return;
+                }
+                if (!drawing) return;
                 points.push(p);
                 const ctx = canvas.getContext('2d');
                 ctx.strokeStyle = '#ef2222';
@@ -482,7 +537,12 @@
                 ctx.lineTo(p.x, p.y);
                 ctx.stroke();
             });
+
             canvas.addEventListener('pointerup', () => {
+                if (movingAnnotation) {
+                    movingAnnotation = null;
+                    return;
+                }
                 if (!drawing) return;
                 drawing = false;
                 recognizeGesture(points);
