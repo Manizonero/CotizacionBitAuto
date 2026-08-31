@@ -42,12 +42,29 @@
         <div class="editor-header"><div><h2>Marcar foto</h2></div><div><button id="cancelEditBtn">Cancelar</button></div></div>
         <div class="canvas-wrap"><canvas id="photoCanvas"></canvas></div>
         <div class="editor-actions">
-            <select id="damageSelect" class="damage-select">
-                <option value="">Daño...</option><option value="Golpe">Golpe</option><option value="Rayones">Rayones</option><option value="Fisura">Fisura</option><option value="Reventado">Reventado</option><option value="Faltan">Faltan</option>
-            </select>
-            <select id="repuestoSelect" class="damage-select"></select>
-            <button id="clearDrawingBtn">Undo</button>
-            <button id="saveMarkedBtn">Guardar</button>
+            <div class="editor-selects" style="display: flex; flex-direction: column; gap: 8px; width: 100%;">
+                <select id="damageSelect" class="damage-select">
+                    <option value="">SELECCIONA UN DAÑO</option>
+                    <option value="Golpe">Golpe</option>
+                    <option value="Hundido">Hundido</option>
+                    <option value="Rizado">Rizado</option>
+                    <option value="Rayones">Rayones</option>
+                    <option value="Fisura">Fisura</option>
+                    <option value="Quebrado">Quebrado</option>
+                    <option value="Difuminado">Difuminado</option>
+                    <option value="Foto Referencia">Foto Referencia</option>
+                    <option value="Despicado">Despicado</option>
+                    <option value="Reventado">Reventado</option>
+                    <option value="Faltan">Faltan</option>
+                </select>
+                <select id="repuestoSelect" class="damage-select">
+                    <option value="">SELECCIONA UN REPUESTO</option>
+                </select>
+            </div>
+            <div style="display: flex; gap: 10px; margin-top: 10px;">
+                <button id="clearDrawingBtn" style="flex: 1;">Undo</button>
+                <button id="saveMarkedBtn" style="flex: 1;">Guardar</button>
+            </div>
         </div>
     </div>
     <div id="deleteModal" class="delete-modal" hidden>

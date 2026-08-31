@@ -397,7 +397,7 @@
 
         const repuestoSelect = $('repuestoSelect');
         if (repuestoSelect) {
-            repuestoSelect.innerHTML = '<option value="">Selecciona un repuesto</option>';
+            repuestoSelect.innerHTML = '<option value="">SELECCIONA UN REPUESTO</option>';
             savedPartDescriptions().forEach((desc) => {
                 const opt = document.createElement('option');
                 opt.value = desc;
@@ -452,7 +452,6 @@
 
         await storage.openDB();
         await refresh();
-        storage.highlightActiveNav();
 
         $('downloadPhotosBtn')?.addEventListener('click', downloadAll);
 
@@ -532,7 +531,6 @@
                 if (!drawing) return;
                 points.push(p);
 
-                // Redibujar todo y añadir el trazo actual para que no se acumulen rayas
                 redraw();
                 const ctx = canvas.getContext('2d');
                 ctx.save();
@@ -586,4 +584,5 @@
     }
 
     document.addEventListener('DOMContentLoaded', init);
+    window.AppStorage.highlightActiveNav();
 })();
