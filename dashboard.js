@@ -28,13 +28,13 @@
                         <h3>${quote.placa}</h3>
                         ${quote.active ? '<span class="status-badge status-active">Abierta</span>' : ''}
                     </div>
-                    <p>${quote.marca} | ${quote.fecha} | ${quote.itemsCount} repuestos</p>
-                </div>
-                <div class="quote-actions">
-                    <div class="status-badges">
+                    <p style="margin-bottom: 8px;">${quote.marca} | ${quote.fecha} | ${quote.itemsCount} repuestos</p>
+                    <div class="status-badges" style="flex-direction: row; gap: 8px;">
                         <span class="status-badge ${photosClass}">${quote.photosDownloaded ? '✓ Fotos' : '✗ Fotos'}</span>
                         <span class="status-badge ${emailClass}">${quote.emailOpened ? '✓ Correo' : '✗ Correo'}</span>
                     </div>
+                </div>
+                <div class="quote-actions">
                     <button class="finalize-btn" data-id="${quote.id}">Finalizar</button>
                 </div>
             `;
@@ -69,6 +69,12 @@
     }
 
     $('createNewBtn').addEventListener('click', () => {
+        const quotes = storage.getAllQuotes();
+        if (quotes.length >= 5) {
+            $('alertMessage').textContent = 'Has alcanzado el límite de 5 cotizaciones simultáneas. Por favor, finaliza alguna de las actuales para continuar.';
+            $('alertModal').hidden = false;
+            return;
+        }
         storage.createNewQuote();
         window.location.href = 'index.html';
     });
@@ -91,6 +97,24 @@
         $('alertModal').hidden = true;
     });
 
-    document.addEventListener('DOMContentLoaded', renderQuotes);
+    const updateUserDisplay = () => {
+        const userName = storage.getUserName();
+        if ($('userNameDisplay')) {
+            $('userNameDisplay').textContent = userName || 'Configurar Usuario';
+        }
+    };
+
+    $('userNameDisplay')?.addEventListener('click', () => {
+        const name = prompt('Ingresa tu nombre completo:', storage.getUserName());
+        if (name !== null) {
+            storage.setUserName(name.trim());
+            updateUserDisplay();
+        }
+    });
+
+    document.addEventListener('DOMContentLoaded', () => {
+        renderQuotes();
+        updateUserDisplay();
+    });
 
 })();

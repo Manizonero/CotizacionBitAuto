@@ -6,16 +6,15 @@
     <title>Fotos Generales</title>
     <link rel="stylesheet" href="fotos.css">
     <style>
-        /* Ajuste específico para Generales si es necesario */
         .photo-panel { margin-top: 20px; }
     </style>
 </head>
 <body>
     <nav class="top-nav" aria-label="Navegacion principal">
-        <a href="dashboard.html" class="nav-ico" aria-label="Bandeja" title="Bandeja"><span aria-hidden="true">📥</span></a>
-        <a href="index.html" class="nav-ico" aria-label="Datos" title="Datos"><span aria-hidden="true">📋</span></a>
+        <a href="dashboard.html" class="nav-ico" aria-label="Datos" title="Datos"><span aria-hidden="true">📥</span></a>
+        <a href="index.html" class="nav-ico" aria-label="Detalles" title="Detalles"><span aria-hidden="true">📋</span></a>
         <a href="generales.html" class="nav-ico" aria-label="Generales" title="Generales"><span aria-hidden="true">🚗</span></a>
-        <a href="fotos.html" class="nav-ico" aria-label="Fotos" title="Fotos"><span aria-hidden="true">📷</span></a>
+        <a id="photosLink" href="fotos.html" class="nav-ico" aria-label="Fotos" title="Fotos"><span aria-hidden="true">📷</span></a>
         <a href="verificacion.html" class="nav-ico" aria-label="Verificacion" title="Verificacion"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="#315ddc" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg></a>
         <a href="correo.html" class="nav-ico" aria-label="Correo" title="Correo"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="#315ddc" d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4-8 5-8-5V6l8 5 8-5v2z"/></svg></a>
     </nav>
@@ -27,58 +26,36 @@
                 <p id="plateLabel" class="plate-label"></p>
             </div>
         </header>
-
-        <section class="photo-panel" aria-labelledby="capture-title">
+        <section class="photo-panel">
             <div class="panel-heading">
-                <div><h2 id="capture-title">Estado exterior / interior</h2><p id="photoStatus" aria-live="polite">Preparando almacenamiento...</p></div>
+                <div><h2>Estado exterior / interior</h2><p id="photoStatus">Preparando almacenamiento...</p></div>
                 <strong id="photoCount">0 fotos</strong>
             </div>
-            <div id="photoGrid" class="photo-grid" aria-live="polite"></div>
+            <div id="photoGrid" class="photo-grid"></div>
             <div class="capture-actions">
-                <label class="action-button primary" for="photoInput" title="Tomar una foto general">📷 Tomar foto</label>
+                <label class="action-button primary" for="photoInput">📷 Tomar foto</label>
                 <input id="photoInput" class="visually-hidden" type="file" accept="image/*" capture="environment" multiple>
                 <input id="detailPhotoInput" class="visually-hidden" type="file" accept="image/*" capture="environment">
             </div>
         </section>
-
-        <div class="download-actions" style="margin-top: 40px;">
+        <div class="download-actions">
             <a href="fotos.html" class="action-button primary" style="text-decoration: none; text-align: center;">Siguiente: Fotos por Repuesto</a>
         </div>
     </main>
-
-    <div id="photoEditor" class="photo-editor" role="dialog" aria-modal="true" aria-labelledby="editorTitle" hidden>
-        <div class="editor-header"><div><h2 id="editorTitle">Marcar foto</h2><p>Cierra el trazo para formar un circulo o dibuja una linea para crear una flecha.</p></div><div class="editor-header-actions"><button id="cancelEditBtn" type="button">Cancelar</button></div></div>
+    <div id="photoEditor" class="photo-editor" hidden>
+        <div class="editor-header"><div><h2>Marcar foto</h2></div><div><button id="cancelEditBtn">Cancelar</button></div></div>
         <div class="canvas-wrap"><canvas id="photoCanvas"></canvas></div>
         <div class="editor-actions">
-            <div class="editor-selects">
-                <select id="damageSelect" class="damage-select" aria-label="Daño">
-                    <option value="">Selecciona un daño</option>
-                    <option value="Golpe">Golpe</option>
-                    <option value="Hundido">Hundido</option>
-                    <option value="Rizado">Rizado</option>
-                    <option value="Rayones">Rayones</option>
-                    <option value="Fisura">Fisura</option>
-                    <option value="Quebrado">Quebrado</option>
-                    <option value="Foto Referencia">Foto Referencia</option>
-                    <option value="Reventado">Reventado</option>
-                    <option value="Faltan">Faltan</option>
-                </select>
-            </div>
-            <div class="editor-button-row">
-                <button id="clearDrawingBtn" type="button" title="Deshacer último trazo" aria-label="Deshacer último trazo"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z"/></svg></button>
-                <button id="saveMarkedBtn" type="button">Guardar</button>
-            </div>
+            <select id="damageSelect" class="damage-select">
+                <option value="">Daño...</option><option value="Golpe">Golpe</option><option value="Rayones">Rayones</option><option value="Fisura">Fisura</option><option value="Reventado">Reventado</option><option value="Faltan">Faltan</option>
+            </select>
+            <button id="clearDrawingBtn">Undo</button>
+            <button id="saveMarkedBtn">Guardar</button>
         </div>
     </div>
-
-    <div id="deleteModal" class="delete-modal" role="dialog" aria-modal="true" aria-labelledby="deleteModalTitle" hidden>
-        <div class="delete-modal-card">
-            <h2 id="deleteModalTitle">Eliminar foto</h2>
-            <p>¿Deseas eliminar esta foto?</p>
-            <div class="delete-modal-actions"><button id="cancelDeleteBtn" type="button">Cancelar</button><button id="confirmDeleteBtn" class="confirm-delete-button" type="button">Eliminar</button></div>
-        </div>
+    <div id="deleteModal" class="delete-modal" hidden>
+        <div class="delete-modal-card"><h2>Eliminar foto</h2><div class="delete-modal-actions"><button id="cancelDeleteBtn">No</button><button id="confirmDeleteBtn">Sí</button></div></div>
     </div>
-
     <script src="storage.js"></script>
     <script src="generales.js"></script>
 </body>

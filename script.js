@@ -22,14 +22,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const nombreCompletoInput = document.getElementById('nombreCompleto');
     const userForm = document.getElementById('userForm');
     const userModal = document.getElementById('userModal');
-    const userNameDisplay = document.getElementById('userNameDisplay');
     const quoteForm = document.getElementById('quoteForm');
     const quoteModal = document.getElementById('quoteModal');
     const quoteSummary = document.getElementById('quoteSummary');
     const editQuoteBtn = document.getElementById('editQuoteBtn');
     const quoteTitle = document.getElementById('quote-title');
     const quoteSubmitBtn = document.getElementById('quoteSubmitBtn');
-    const newQuoteBtn = document.getElementById('newQuoteBtn');
+    const cancelQuoteBtn = document.getElementById('cancelQuoteBtn');
     const photosLink = document.getElementById('photosLink');
     const newQuoteWarningModal = document.getElementById('newQuoteWarningModal');
     const cancelNewQuoteBtn = document.getElementById('cancelNewQuoteBtn');
@@ -50,14 +49,13 @@ document.addEventListener('DOMContentLoaded', () => {
     // Gestión del estado centralizada mediante AppStorage (storage.js)
     const storage = window.AppStorage;
 
-    // Array para almacenar los ítems de la cotización
     let quoteItems = [];
     let isLoading = false;
     let itemPendingDelete = null;
+    let editingItem = null;
 
     const saveState = () => {
         if (isLoading) return;
-        
         const currentState = storage.getState();
         const state = {
             fields: {
@@ -85,32 +83,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (photosLink) photosLink.href = `fotos.html?placa=${placaParam}&marca=${marcaParam}`;
     };
 
-    const clearState = () => {
-        storage.clearState();
-    };
-
-    const updateUserDisplay = () => {
-        const userName = storage.getUserName();
-        userNameDisplay.textContent = userName;
-        userNameDisplay.title = userName ? 'Editar usuario' : '';
-    };
-
-    const openUserModal = () => {
-        userModal.hidden = false;
-        nombreCompletoInput.value = storage.getUserName();
-        nombreCompletoInput.focus();
-    };
-
-    const closeUserModal = () => {
-        userModal.hidden = true;
-        updateUserDisplay();
-    };
     const getToday = () => {
         const today = new Date();
         const month = String(today.getMonth() + 1).padStart(2, '0');
         const day = String(today.getDate()).padStart(2, '0');
         return `${today.getFullYear()}-${month}-${day}`;
     };
+
     const updateQuoteCard = () => {
         const hasQuote = placaInput.value.trim();
         quoteSummary.hidden = !hasQuote;
@@ -127,11 +106,15 @@ document.addEventListener('DOMContentLoaded', () => {
             quoteDateDisplay: fechaInput.value
         };
         Object.entries(values).forEach(([id, value]) => {
-            document.getElementById(id).textContent = value || '-';
+            const el = document.getElementById(id);
+            if (el) el.textContent = value || '-';
         });
-        document.getElementById('quoteCilindrajeDetail').hidden = cilindrajeInput.disabled;
-        document.getElementById('quoteVinDetail').hidden = vinInput.disabled;
+        const cilDetail = document.getElementById('quoteCilindrajeDetail');
+        const vinDetail = document.getElementById('quoteVinDetail');
+        if (cilDetail) cilDetail.hidden = cilindrajeInput.disabled;
+        if (vinDetail) vinDetail.hidden = vinInput.disabled;
     };
+
     const openQuoteModal = (isEditing = false) => {
         quoteModal.hidden = false;
         quoteTitle.textContent = isEditing ? 'EDITAR COTIZACION' : 'NUEVA COTIZACION';
@@ -139,18 +122,12 @@ document.addEventListener('DOMContentLoaded', () => {
         toggleFields();
         placaInput.focus();
     };
+
     const closeQuoteModal = () => {
         quoteModal.hidden = true;
         updateQuoteCard();
     };
 
-    const setSelectValue = (select, value) => {
-        const normalizedValue = String(value || '').trim().toUpperCase();
-        const option = [...select.options].find((item) => item.value.trim().toUpperCase() === normalizedValue);
-        select.value = option ? option.value : '';
-    };
-
-    // Función para renderizar la tabla desde el array quoteItems
     const renderTable = () => {
         itemsTableBody.innerHTML = '';
         updatePartSuggestions(descripInput.value);
@@ -171,7 +148,6 @@ document.addEventListener('DOMContentLoaded', () => {
             newRow.addEventListener('touchend', handleTouchEnd);
             newRow.addEventListener('touchcancel', handleTouchEnd); 
 
-            // Insertar celdas (<td>) en la fila con los datos
             newRow.insertCell().textContent = item.descrip;
             newRow.insertCell().textContent = item.cant;
             newRow.insertCell().textContent = item.estado;
@@ -187,10 +163,13 @@ document.addEventListener('DOMContentLoaded', () => {
             editButton.addEventListener('click', () => {
                 descripInput.value = item.descrip;
                 cantInput.value = item.cant;
-                setSelectValue(dymInput, item.dym);
-                setSelectValue(estadoInput, item.estado);
-                setSelectValue(pintInput, item.pint);
-                datInput.value = item.dat;
+                const dymSel = document.getElementById('dym');
+                const estSel = document.getElementById('estado');
+                const pinSel = document.getElementById('pint');
+                if (dymSel) dymSel.value = item.dym || '';
+                if (estSel) estSel.value = item.estado || '';
+                if (pinSel) pinSel.value = item.pint || '';
+                datInput.value = item.dat || '';
                 editingItem = item;
                 addItemButton.textContent = 'Actualizar';
                 descripInput.focus();
@@ -230,8 +209,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const userName = storage.getUserName();
 
         if (!userName) {
-            updateUserDisplay();
-            openUserModal();
+            userModal.hidden = false;
+            nombreCompletoInput.focus();
             return;
         }
 
@@ -248,57 +227,33 @@ document.addEventListener('DOMContentLoaded', () => {
                 cilindrajeInput.value = state.fields.cilindraje || '';
                 vinInput.value = state.fields.vin || '';
             }
-
             quoteItems = (Array.isArray(state.quoteItems) ? state.quoteItems : []).map((item) => (item && item.id ? item : { ...item, id: storage.makeId() }));
             renderTable();
         } catch (error) {
-            console.warn('No se pudo cargar el estado guardado:', error);
+            console.warn('Error loadState:', error);
         } finally {
             isLoading = false;
         }
 
         saveState();
-        updateUserDisplay();
         updateQuoteCard();
-
         if (!placaInput.value.trim()) {
             openQuoteModal();
         }
     };
 
-    const watchedFields = [
-        fechaInput,
-        placaInput,
-        marcaInput,
-        lineaInput,
-        modeloInput,
-        colorInput,
-        tipoClienteInput,
-        cilindrajeInput,
-        vinInput
-    ];
-
-    const uppercaseFields = [placaInput, marcaInput, lineaInput, colorInput, tipoClienteInput];
-    const normalizeUppercaseFields = () => {
-        uppercaseFields.forEach((field) => {
-            if (field) field.value = field.value.toUpperCase();
-        });
-    };
-
-    uppercaseFields.forEach((field) => {
-        if (field) {
-            field.addEventListener('input', saveState);
-            field.addEventListener('blur', () => {
-                field.value = field.value.toUpperCase();
-                saveState();
-                updateQuoteCard();
-            });
-        }
-    });
+    const watchedFields = [fechaInput, placaInput, marcaInput, lineaInput, modeloInput, colorInput, tipoClienteInput, cilindrajeInput, vinInput];
 
     watchedFields.forEach((field) => {
         if (field) {
             field.addEventListener('input', saveState);
+            if (field.id !== 'modelo' && field.id !== 'cilindraje') {
+                field.addEventListener('blur', () => {
+                    field.value = field.value.toUpperCase();
+                    saveState();
+                    updateQuoteCard();
+                });
+            }
         }
     });
 
@@ -306,75 +261,41 @@ document.addEventListener('DOMContentLoaded', () => {
 
     userForm.addEventListener('submit', (event) => {
         event.preventDefault();
-        if (!userForm.reportValidity()) return;
         storage.setUserName(nombreCompletoInput.value.trim());
-        closeUserModal();
+        userModal.hidden = true;
         if (!placaInput.value.trim()) openQuoteModal();
     });
 
-    userNameDisplay.addEventListener('click', openUserModal);
+    if (cancelQuoteBtn) {
+        cancelQuoteBtn.addEventListener('click', async () => {
+            const state = storage.getState();
+            // Si el usuario cancela una cotización que aún no tiene placa (recién creada)
+            if (!state.fields.placa) {
+                const currentId = storage.getActiveQuoteId();
+                await storage.deleteQuote(currentId);
+            }
+            window.location.href = 'dashboard.html';
+        });
+    }
+
     editQuoteBtn.addEventListener('click', () => openQuoteModal(true));
+
     quoteForm.addEventListener('submit', (event) => {
         event.preventDefault();
-        if (!quoteForm.reportValidity()) return;
-        normalizeUppercaseFields();
         fechaInput.value = getToday();
         saveState();
         updateQuoteCard();
         closeQuoteModal();
-        // Redirigir a Generales después de guardar datos del vehículo
         window.location.href = 'generales.html';
     });
 
     const resetFormFields = () => {
-        fechaInput.value = '';
-        placaInput.value = '';
-        marcaInput.value = '';
-        lineaInput.value = '';
-        modeloInput.value = '';
-        colorInput.value = '';
-        tipoClienteInput.value = '';
-        cilindrajeInput.value = '';
-        vinInput.value = '';
+        watchedFields.forEach(f => { if(f) f.value = ''; });
         descripInput.value = '';
         cantInput.value = '';
-        dymInput.value = '';
-        estadoInput.value = '';
-        pintInput.value = '';
         datInput.value = '';
     };
 
-    const handleNewQuote = () => {
-        const state = storage.getState();
-        if (state.fields.placa) {
-            if (!state.photosDownloaded) {
-                showAlert('No puedes iniciar una nueva cotización sin antes haber descargado las imágenes.');
-                return;
-            }
-            if (!state.emailOpened) {
-                showAlert('No puedes iniciar una nueva cotización sin antes haber enviado el correo (abierto Gmail).');
-                return;
-            }
-        }
-        newQuoteWarningModal.hidden = false;
-    };
-
-    const confirmNewQuote = async () => {
-        newQuoteWarningModal.hidden = true;
-        storage.createNewQuote();
-
-        quoteItems = [];
-        resetFormFields();
-
-        renderTable();
-        addItemButton.textContent = 'Agregar';
-        toggleFields();
-        openQuoteModal();
-    };
-
-    cancelNewQuoteBtn.addEventListener('click', () => { newQuoteWarningModal.hidden = true; });
-    confirmNewQuoteBtn.addEventListener('click', confirmNewQuote);
-    cancelDeleteItemBtn.addEventListener('click', () => { itemPendingDelete = null; deleteItemModal.hidden = true; });
     confirmDeleteItemBtn.addEventListener('click', () => {
         if (itemPendingDelete === null) return;
         quoteItems.splice(itemPendingDelete, 1);
@@ -383,266 +304,112 @@ document.addEventListener('DOMContentLoaded', () => {
         renderTable();
     });
 
-    // Lógica para habilitar/deshabilitar campos (Marca, Cilindraje, VIN)
-    // Deshabilitar los campos por defecto al cargar la página
-    cilindrajeInput.disabled = true;
-    vinInput.disabled = true;
+    cancelDeleteItemBtn.addEventListener('click', () => { itemPendingDelete = null; deleteItemModal.hidden = true; });
 
     const toggleFields = () => {
         const marcaValue = marcaInput.value.trim().toLowerCase();
-        if (marcaValue === 'suzuki' || marcaValue === 'citroen') {
-            cilindrajeInput.disabled = false;
-            vinInput.disabled = false;
-            document.getElementById('cilindrajeField').hidden = false;
-            document.getElementById('vinField').hidden = false;
-        } else {
-            cilindrajeInput.disabled = true;
-            vinInput.value = ''; // Limpiar el valor del input si se deshabilita
-            vinInput.disabled = true;
-            cilindrajeInput.value = ''; // Limpiar el valor del input si se deshabilita
-            document.getElementById('cilindrajeField').hidden = true;
-            document.getElementById('vinField').hidden = true;
-        }
+        const isSpec = (marcaValue === 'suzuki' || marcaValue === 'citroen');
+        cilindrajeInput.disabled = !isSpec;
+        vinInput.disabled = !isSpec;
+        document.getElementById('cilindrajeField').hidden = !isSpec;
+        document.getElementById('vinField').hidden = !isSpec;
         updateQuoteCard();
     };
 
     marcaInput.addEventListener('input', toggleFields);
 
-    loadState();
-    normalizeUppercaseFields();
-    
-    // Verificar estado de marca después de cargar datos guardados
-    toggleFields();
-
-    // Variable para almacenar la fila que se está arrastrando
+    // --- Drag & Drop ---
     let draggedRow = null;
-    let longPressTimer = null; // Temporizador para el toque largo
-    const LONG_PRESS_DELAY = 400; // Milisegundos para un toque largo
-    let initialTouchY = 0; 
-    let initialTouchX = 0; 
-    const MOVEMENT_TOLERANCE = 5;
-
-    let currentDragTarget = null; 
-    let isTouchDragging = false;
-    let editingItem = null;
-
-    function handleDragStart(e) {
-        draggedRow = this;
-        e.dataTransfer.effectAllowed = 'move';
-        e.dataTransfer.setData('text/html', this.outerHTML);
-        setTimeout(() => {
-            this.classList.add('dragging');
-        }, 0);
-    }
-
-    function handleDragOver(e) {
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'move';
-        if (this !== draggedRow) {
-            this.classList.add('drop-target');
-        }
-    }
-
-    function handleDragLeave() {
-        this.classList.remove('drop-target');
-    }
-
-    async function handleDrop(e) {
+    function handleDragStart() { draggedRow = this; this.classList.add('dragging'); }
+    function handleDragOver(e) { e.preventDefault(); this.classList.add('drop-target'); }
+    function handleDragLeave() { this.classList.remove('drop-target'); }
+    function handleDrop(e) {
         e.preventDefault();
         this.classList.remove('drop-target');
-        if (this === draggedRow) {
-            return;
-        }
-        const draggedIndex = parseInt(draggedRow.dataset.index);
-        const targetIndex = parseInt(this.dataset.index);
-        const [movedItem] = quoteItems.splice(draggedIndex, 1);
-        quoteItems.splice(targetIndex, 0, movedItem);
+        if (this === draggedRow) return;
+        const fromIdx = parseInt(draggedRow.dataset.index);
+        const toIdx = parseInt(this.dataset.index);
+        const [item] = quoteItems.splice(fromIdx, 1);
+        quoteItems.splice(toIdx, 0, item);
         renderTable();
     }
+    function handleDragEnd() { this.classList.remove('dragging'); }
 
-    function handleDragEnd() {
-        this.classList.remove('dragging');
-        const dropTargets = document.querySelectorAll('#itemsTable tbody tr.drop-target');
-        dropTargets.forEach(target => target.classList.remove('drop-target'));
-        draggedRow = null;
-    }
-
+    // --- Touch ---
+    let longPressTimer = null;
+    let isTouchDragging = false;
     function handleTouchStart(e) {
-        if (e.touches.length !== 1) return;
-        
-        if (longPressTimer) {
-            clearTimeout(longPressTimer);
-        }
-
         draggedRow = this;
-        initialTouchY = e.touches[0].clientY;
-        initialTouchX = e.touches[0].clientX;
-        isTouchDragging = false;
-
         longPressTimer = setTimeout(() => {
-            const currentY = e.touches[0].clientY;
-            const currentX = e.touches[0].clientX;
-            const deltaY = Math.abs(currentY - initialTouchY);
-            const deltaX = Math.abs(currentX - initialTouchX);
-            const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-
-            if (distance < MOVEMENT_TOLERANCE) {
-                isTouchDragging = true;
-                draggedRow.classList.add('dragging');
-                e.preventDefault(); 
-                if (navigator.vibrate) {
-                    navigator.vibrate(50); 
-                }
-            } else {
-                handleTouchEnd(); 
-            }
-        }, LONG_PRESS_DELAY);
+            isTouchDragging = true;
+            this.classList.add('dragging');
+            if (navigator.vibrate) navigator.vibrate(50);
+        }, 400);
     }
-
     function handleTouchMove(e) {
-        if (!isTouchDragging) {
-            const currentY = e.touches[0].clientY;
-            const currentX = e.touches[0].clientX;
-            const deltaY = Math.abs(currentY - initialTouchY);
-            const deltaX = Math.abs(currentX - initialTouchX);
-            const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-
-            if (longPressTimer && distance > MOVEMENT_TOLERANCE) {
-                clearTimeout(longPressTimer);
-                longPressTimer = null;
-                return;
-            }
-            return;
-        }
-
+        if (!isTouchDragging) { clearTimeout(longPressTimer); return; }
         e.preventDefault();
-
-        const touchY = e.touches[0].clientY;
-        const touchX = e.touches[0].clientX;
-        const targetElement = document.elementFromPoint(touchX, touchY);
-
-        let newDropTarget = null;
-        if (targetElement) {
-            newDropTarget = targetElement.closest('tr');
-            if (newDropTarget && newDropTarget.closest('#itemsTable tbody') && newDropTarget !== draggedRow) {
-                if (currentDragTarget && currentDragTarget !== newDropTarget) {
-                    currentDragTarget.classList.remove('drop-target');
-                }
-                newDropTarget.classList.add('drop-target');
-                currentDragTarget = newDropTarget;
-            } else {
-                if (currentDragTarget) {
-                    currentDragTarget.classList.remove('drop-target');
-                    currentDragTarget = null;
-                }
+        const touch = e.touches[0];
+        const target = document.elementFromPoint(touch.clientX, touch.clientY)?.closest('tr');
+        if (target && target !== draggedRow && target.closest('tbody')) {
+            document.querySelectorAll('.drop-target').forEach(el => el.classList.remove('drop-target'));
+            target.classList.add('drop-target');
+        }
+    }
+    function handleTouchEnd() {
+        clearTimeout(longPressTimer);
+        if (isTouchDragging) {
+            const target = document.querySelector('.drop-target');
+            if (target) {
+                const fromIdx = parseInt(draggedRow.dataset.index);
+                const toIdx = parseInt(target.dataset.index);
+                const [item] = quoteItems.splice(fromIdx, 1);
+                quoteItems.splice(toIdx, 0, item);
+                renderTable();
             }
         }
-        
-    }
-
-    function handleTouchEnd() {
-        if (longPressTimer) {
-            clearTimeout(longPressTimer);
-            longPressTimer = null;
-        }
-
-        if (!isTouchDragging) {
-            draggedRow = null; 
-            return;
-        }
-
-        if (draggedRow) {
-            draggedRow.classList.remove('dragging');
-        }
-
-        if (currentDragTarget && currentDragTarget !== draggedRow) {
-            const draggedIndex = parseInt(draggedRow.dataset.index);
-            const targetIndex = parseInt(currentDragTarget.dataset.index);
-
-            const [movedItem] = quoteItems.splice(draggedIndex, 1);
-            quoteItems.splice(targetIndex, 0, movedItem);
-            
-            renderTable();
-        }
-
-        if (currentDragTarget) {
-            currentDragTarget.classList.remove('drop-target');
-        }
-        draggedRow = null;
-        currentDragTarget = null;
-        initialTouchY = 0;
-        initialTouchX = 0;
         isTouchDragging = false;
+        if (draggedRow) draggedRow.classList.remove('dragging');
+        document.querySelectorAll('.drop-target').forEach(el => el.classList.remove('drop-target'));
     }
 
     addItemButton.addEventListener('click', () => {
         const descrip = descripInput.value.trim();
-        const cant = cantInput.value.trim();
-        const dym = dymInput.value.trim();
-        const estado = estadoInput.value.trim().toUpperCase();
-        const pint = pintInput.value.trim();
-        const dat = datInput.value.trim();
-
-        if (!descrip) {
-            alert('La descripción es obligatoria para agregar un ítem.');
-            return;
-        }
-
+        if (!descrip) { showAlert('La descripción es obligatoria.'); return; }
         const newItem = {
             id: editingItem ? editingItem.id : storage.makeId(),
             descrip,
-            cant,
-            dym,
-            estado,
-            pint,
-            dat
+            cant: cantInput.value.trim(),
+            dym: document.getElementById('dym').value,
+            estado: document.getElementById('estado').value,
+            pint: document.getElementById('pint').value,
+            dat: datInput.value.trim()
         };
-
-        if (editingItem !== null) {
-            const itemIndex = quoteItems.indexOf(editingItem);
-            if (itemIndex !== -1) quoteItems[itemIndex] = { ...editingItem, ...newItem };
+        if (editingItem) {
+            const idx = quoteItems.findIndex(i => i.id === editingItem.id);
+            if (idx !== -1) quoteItems[idx] = newItem;
             editingItem = null;
             addItemButton.textContent = 'Agregar';
         } else {
-            quoteItems.push(newItem); 
+            quoteItems.push(newItem);
         }
-
-        renderTable(); 
-        descripInput.value = '';
-        cantInput.value = '';
-        dymInput.value = '';
-        estadoInput.value = '';
-        pintInput.value = '';
-        datInput.value = '';
-        descripInput.focus();
+        renderTable();
+        descripInput.value = ''; cantInput.value = ''; datInput.value = ''; descripInput.focus();
     });
 
-    if (newQuoteBtn) {
-        newQuoteBtn.addEventListener('click', handleNewQuote);
-    }
+    loadState();
 
-/* --- Puente para integración por voz (voice.js) ---
-       Expone un API mínima para que voice.js registre/elimine ítems
-       reutilizando la lógica existente de quoteItems. */
     window.CoticarVoice = {
         register(item) {
             if (!item || !item.descrip) return false;
-            quoteItems.push({ ...item, id: item.id || storage.makeId() });
+            quoteItems.push({ ...item, id: storage.makeId() });
             renderTable();
-            saveState();
             return true;
         },
         removeLast() {
-            if (quoteItems.length) {
-                quoteItems.pop();
-                renderTable();
-                saveState();
-                return true;
-            }
+            if (quoteItems.length) { quoteItems.pop(); renderTable(); return true; }
             return false;
         },
-        getItemsCount() {
-            return quoteItems.length;
-        }
+        getItemsCount() { return quoteItems.length; }
     };
 });
