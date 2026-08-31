@@ -74,6 +74,8 @@ document.addEventListener('DOMContentLoaded', () => {
             },
             quoteItems,
             naItems: Array.isArray(currentState.naItems) ? currentState.naItems.filter((id) => quoteItems.some((item) => item.id === id)) : [],
+            photosDownloaded: currentState.photosDownloaded || false,
+            emailOpened: currentState.emailOpened || false,
             photosDownloadedFor: currentState.photosDownloadedFor === placaInput.value.trim().toUpperCase()
                 ? currentState.photosDownloadedFor
                 : ''
@@ -371,7 +373,12 @@ document.addEventListener('DOMContentLoaded', () => {
         newQuoteWarningModal.hidden = true;
         quoteItems = [];
         resetFormFields();
-        clearState();
+        storage.clearState();
+        // Aseguramos que el nuevo estado empiece limpio (flags en false)
+        const newState = storage.getInitialState();
+        newState.fields.nombreCompleto = nombreCompletoInput.value.trim(); // Preservar nombre del asesor
+        storage.saveState(newState);
+
         renderTable();
         addItemButton.textContent = 'Agregar';
         toggleFields();
