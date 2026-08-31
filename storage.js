@@ -30,7 +30,9 @@
                 const parsed = JSON.parse(master);
                 if (parsed.fields && !parsed.quotes) {
                     const oldId = AppStorage.makeId();
-                    return { activeQuoteId: oldId, quotes: { [oldId]: parsed } };
+                    const migrated = { activeQuoteId: oldId, quotes: { [oldId]: parsed } };
+                    AppStorage._saveMasterState(migrated);
+                    return migrated;
                 }
                 return parsed;
             } catch (error) {
@@ -182,6 +184,23 @@
             const state = AppStorage.getState();
             state.emailOpened = !!status;
             AppStorage.saveState(state);
+        },
+
+        // --- Utilidades de UI ---
+        /**
+         * Resalta el icono activo en la navegación superior.
+         */
+        highlightActiveNav: () => {
+            const currentPath = window.location.pathname.split('/').pop() || 'index.html';
+            const navLinks = document.querySelectorAll('.top-nav .nav-ico');
+            navLinks.forEach(link => {
+                const linkPath = link.getAttribute('href');
+                if (linkPath === currentPath) {
+                    link.classList.add('active-nav');
+                } else {
+                    link.classList.remove('active-nav');
+                }
+            });
         },
 
         // --- Configuración Global ---

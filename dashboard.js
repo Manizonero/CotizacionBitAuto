@@ -115,6 +115,7 @@
     document.addEventListener('DOMContentLoaded', () => {
         renderQuotes();
         updateUserDisplay();
+        storage.highlightActiveNav();
     });
 
 })();

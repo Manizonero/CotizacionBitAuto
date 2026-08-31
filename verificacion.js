@@ -102,6 +102,7 @@
             $('verifStatus').textContent = 'Lista restablecida. Selecciona los repuestos que ingresaste.';
         });
         render();
+        storage.highlightActiveNav();
     }
 
     document.addEventListener('DOMContentLoaded', init);

@@ -452,6 +452,7 @@
 
         await storage.openDB();
         await refresh();
+        storage.highlightActiveNav();
 
         $('downloadPhotosBtn')?.addEventListener('click', downloadAll);
 

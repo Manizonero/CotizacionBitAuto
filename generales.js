@@ -367,6 +367,7 @@
 
         await storage.openDB();
         await refresh();
+        storage.highlightActiveNav();
     }
 
     document.addEventListener('DOMContentLoaded', init);

@@ -23,7 +23,11 @@
     let editingContactIndex = null;
     let editingGroupIndex = null;
 
-    const subject = () => `COTIZACION ${fields.marca || ''} ${fields.placa || ''} ${fields.linea || ''} ${fields.tipoCliente || ''}`.replace(/\s+/g, ' ').trim();
+    const subject = () => {
+        const freshState = storage.getState();
+        const f = freshState.fields || {};
+        return `COTIZACION ${f.marca || ''} ${f.placa || ''} ${f.linea || ''} ${f.tipoCliente || ''}`.replace(/\s+/g, ' ').trim();
+    };
     const fitCell = (value, width) => String(value || '-').replace(/[\r\n]+/g, ' ').slice(0, width).padEnd(width, ' ');
 
     const partsGrid = () => {
@@ -289,5 +293,6 @@
         $('mailVehicleLabel').textContent = `${fields.marca || '-'} ${fields.linea || '-'} / ${fields.placa || '-'}`;
         updateGroupSelector();
         updatePreview();
+        storage.highlightActiveNav();
     });
 })();

@@ -229,6 +229,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             quoteItems = (Array.isArray(state.quoteItems) ? state.quoteItems : []).map((item) => (item && item.id ? item : { ...item, id: storage.makeId() }));
             renderTable();
+            toggleFields(); // Asegurar que se oculten los campos según la marca cargada
         } catch (error) {
             console.warn('Error loadState:', error);
         } finally {
@@ -311,8 +312,18 @@ document.addEventListener('DOMContentLoaded', () => {
         const isSpec = (marcaValue === 'suzuki' || marcaValue === 'citroen');
         cilindrajeInput.disabled = !isSpec;
         vinInput.disabled = !isSpec;
-        document.getElementById('cilindrajeField').hidden = !isSpec;
-        document.getElementById('vinField').hidden = !isSpec;
+
+        const cilField = document.getElementById('cilindrajeField');
+        const vinField = document.getElementById('vinField');
+        if (cilField) cilField.hidden = !isSpec;
+        if (vinField) vinField.hidden = !isSpec;
+
+        // Habilitar o ocultar en la tarjeta de resumen
+        const cilDetail = document.getElementById('quoteCilindrajeDetail');
+        const vinDetail = document.getElementById('quoteVinDetail');
+        if (cilDetail) cilDetail.hidden = !isSpec;
+        if (vinDetail) vinDetail.hidden = !isSpec;
+
         updateQuoteCard();
     };
 
@@ -398,6 +409,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     loadState();
+    storage.highlightActiveNav();
 
     window.CoticarVoice = {
         register(item) {
