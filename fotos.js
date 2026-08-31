@@ -436,7 +436,7 @@
                 cy: (Math.min(...ys) + Math.max(...ys)) / 2,
                 radius: Math.min(width, height) / 2
             });
-        } else {
+        } else if (dist > 20) {
             annotations.push({
                 type: 'arrow',
                 x1: first.x, y1: first.y,
@@ -530,12 +530,21 @@
                 }
                 if (!drawing) return;
                 points.push(p);
+
+                // Redibujar todo y añadir el trazo actual para que no se acumulen rayas
+                redraw();
                 const ctx = canvas.getContext('2d');
+                ctx.save();
                 ctx.strokeStyle = '#ef2222';
                 ctx.lineWidth = annotationStrokeWidth();
                 ctx.lineCap = 'round';
-                ctx.lineTo(p.x, p.y);
+                ctx.beginPath();
+                ctx.moveTo(points[0].x, points[0].y);
+                for (let i = 1; i < points.length; i++) {
+                    ctx.lineTo(points[i].x, points[i].y);
+                }
                 ctx.stroke();
+                ctx.restore();
             });
 
             canvas.addEventListener('pointerup', () => {
