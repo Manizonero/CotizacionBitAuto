@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bandeja de Cotizaciones</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .dashboard-container {
+            width: 90%;
+            max-width: 1120px;
+            margin: 40px auto;
+        }
+        .quote-list {
+            display: grid;
+            gap: 16px;
+            margin-top: 24px;
+        }
+        .quote-item {
+            background: #ffffff;
+            border: 1px solid #d8e0f0;
+            border-radius: 12px;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: transform 0.2s, box-shadow 0.2s;
+            cursor: pointer;
+        }
+        .quote-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(50, 78, 130, 0.1);
+        }
+        .quote-item.active {
+            border-left: 6px solid #315ddc;
+            background: #f8fbff;
+        }
+        .quote-info h3 {
+            margin: 0;
+            font-size: 1.4rem;
+            color: #16213d;
+        }
+        .quote-info p {
+            margin: 4px 0 0;
+            color: #6d7592;
+            font-size: 0.9rem;
+        }
+        .quote-actions {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+        .status-badges {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            margin-right: 15px;
+        }
+        .status-badge {
+            padding: 2px 8px;
+            border-radius: 6px;
+            font-size: 0.65rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            text-align: center;
+        }
+        .status-active { background: #eef4ff; color: #315ddc; }
+        .status-done { background: #e5f6ec; color: #17643a; }
+        .status-pending { background: #fff1f0; color: #cf1322; }
+
+        .finalize-btn {
+            background: #17643a;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-family: "Oxanium", sans-serif;
+            font-weight: 600;
+        }
+        .finalize-btn:hover { background: #12502e; }
+
+        .new-btn-container {
+            display: flex;
+            justify-content: flex-end;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <nav class="top-nav" aria-label="Navegacion principal">
+        <a href="dashboard.html" class="nav-ico" aria-label="Bandeja" title="Bandeja"><span aria-hidden="true">📥</span></a>
+        <a href="index.html" class="nav-ico" aria-label="Datos" title="Datos"><span aria-hidden="true">📋</span></a>
+        <a href="generales.html" class="nav-ico" aria-label="Generales" title="Generales"><span aria-hidden="true">🚗</span></a>
+        <a id="photosLink" href="fotos.html" class="nav-ico" aria-label="Fotos" title="Fotos"><span aria-hidden="true">📷</span></a>
+        <a href="verificacion.html" class="nav-ico" aria-label="Verificacion" title="Verificacion"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="#315ddc" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg></a>
+        <a href="correo.html" class="nav-ico" aria-label="Correo" title="Correo"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="#315ddc" d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4-8 5-8-5V6l8 5 8-5v2z"/></svg></a>
+    </nav>
+
+    <div class="dashboard-container">
+        <header class="site-header" style="margin-top: 0; width: 100%;">
+            <h1 class="site-title">BANDEJA</h1>
+        </header>
+
+        <div class="new-btn-container">
+            <button id="createNewBtn" class="secondary-button" style="background: #315ddc; color: white;">+ Nueva Cotización</button>
+        </div>
+
+        <div id="quoteList" class="quote-list">
+            <!-- Las cotizaciones se cargarán aquí -->
+        </div>
+    </div>
+
+    <div id="finalizeModal" class="user-modal" hidden>
+        <div class="user-modal-content">
+            <h2 id="finalizeTitle">¿Finalizar cotización?</h2>
+            <p id="finalizeMessage">Esta acción archivará la cotización actual.</p>
+            <div class="new-quote-warning-actions" style="margin-top: 20px;">
+                <button id="cancelFinalizeBtn" class="secondary-button">Cancelar</button>
+                <button id="confirmFinalizeBtn" class="secondary-button warning-button">Sí, Finalizar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="alertModal" class="user-modal" hidden>
+        <div class="user-modal-content">
+            <h2>ATENCIÓN</h2>
+            <p id="alertMessage"></p>
+            <div class="new-quote-warning-actions" style="margin-top: 20px;">
+                <button id="closeAlertBtn" class="secondary-button">Entendido</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="storage.js"></script>
+    <script src="dashboard.js"></script>
+</body>
+</html>

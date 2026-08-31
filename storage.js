@@ -2,6 +2,7 @@
  * storage.js - Centralización del estado y persistencia (LocalStorage e IndexedDB)
  * -------------------------------------------------------------------------
  * Proporciona una API única para acceder y modificar los datos de la aplicación.
+ * Soporta múltiples cotizaciones simultáneas y datos globales de usuario.
  */
 (function(window) {
     'use strict';
@@ -10,102 +11,124 @@
     const CONTACTS_KEY = 'coticarEmailContacts';
     const GROUPS_KEY = 'coticarEmailGroups';
     const SETTINGS_KEY = 'coticarEmailSettings';
+    const GLOBAL_USER_KEY = 'coticarGlobalUser';
     const DB_NAME = 'TallerDB';
     const STORE_NAME = 'inspecciones';
 
     const AppStorage = {
-        /**
-         * Genera un ID único para los ítems.
-         */
         makeId: () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8),
 
-        // --- Gestión de LocalStorage ---
+        // --- Gestión de Usuario Global ---
+        getUserName: () => localStorage.getItem(GLOBAL_USER_KEY) || '',
+        setUserName: (name) => localStorage.setItem(GLOBAL_USER_KEY, name),
+
+        // --- Gestión de Sesiones Múltiples ---
+        _getMasterState: () => {
+            try {
+                const master = localStorage.getItem(STORAGE_KEY);
+                if (!master) return AppStorage._createInitialMaster();
+                const parsed = JSON.parse(master);
+                if (parsed.fields && !parsed.quotes) {
+                    const oldId = AppStorage.makeId();
+                    return { activeQuoteId: oldId, quotes: { [oldId]: parsed } };
+                }
+                return parsed;
+            } catch (error) {
+                return AppStorage._createInitialMaster();
+            }
+        },
+
+        _createInitialMaster: () => {
+            const firstId = AppStorage.makeId();
+            const master = {
+                activeQuoteId: firstId,
+                quotes: { [firstId]: AppStorage.getInitialState() }
+            };
+            AppStorage._saveMasterState(master);
+            return master;
+        },
+
+        _saveMasterState: (master) => {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(master));
+        },
+
+        getActiveQuoteId: () => AppStorage._getMasterState().activeQuoteId,
+
+        setActiveQuote: (id) => {
+            const master = AppStorage._getMasterState();
+            if (master.quotes[id]) {
+                master.activeQuoteId = id;
+                AppStorage._saveMasterState(master);
+            }
+        },
+
+        createNewQuote: () => {
+            const master = AppStorage._getMasterState();
+            const newId = AppStorage.makeId();
+            master.quotes[newId] = AppStorage.getInitialState();
+            master.activeQuoteId = newId;
+            AppStorage._saveMasterState(master);
+            return newId;
+        },
 
         /**
-         * Obtiene el estado completo desde LocalStorage.
+         * Finaliza/Elimina una cotización.
          */
+        deleteQuote: async (id) => {
+            const master = AppStorage._getMasterState();
+            const placa = master.quotes[id]?.fields?.placa;
+            delete master.quotes[id];
+
+            if (master.activeQuoteId === id) {
+                const keys = Object.keys(master.quotes);
+                if (keys.length > 0) {
+                    master.activeQuoteId = keys[0];
+                } else {
+                    const newId = AppStorage.makeId();
+                    master.quotes[newId] = AppStorage.getInitialState();
+                    master.activeQuoteId = newId;
+                }
+            }
+            AppStorage._saveMasterState(master);
+
+            if (placa) {
+                const otherWithSamePlate = Object.values(master.quotes).some(q => q.fields?.placa === placa);
+                if (!otherWithSamePlate) {
+                    await AppStorage.deletePhotosByPlate(placa);
+                }
+            }
+        },
+
+        getAllQuotes: () => {
+            const master = AppStorage._getMasterState();
+            return Object.entries(master.quotes).map(([id, data]) => ({
+                id,
+                placa: data.fields?.placa || 'SIN PLACA',
+                marca: data.fields?.marca || '-',
+                fecha: data.fields?.fecha || '-',
+                itemsCount: data.quoteItems?.length || 0,
+                active: id === master.activeQuoteId,
+                photosDownloaded: data.photosDownloaded,
+                emailOpened: data.emailOpened
+            }));
+        },
+
+        // --- Gestión de Datos de la Cotización Activa ---
         getState: () => {
-            try {
-                const state = localStorage.getItem(STORAGE_KEY);
-                return state ? JSON.parse(state) : AppStorage.getInitialState();
-            } catch (error) {
-                console.error('Error al leer LocalStorage:', error);
-                return AppStorage.getInitialState();
-            }
+            const master = AppStorage._getMasterState();
+            return master.quotes[master.activeQuoteId] || AppStorage.getInitialState();
         },
 
-        /**
-         * Obtiene los contactos de correo.
-         */
-        getContacts: () => {
-            try {
-                const contacts = localStorage.getItem(CONTACTS_KEY);
-                return contacts ? JSON.parse(contacts) : [];
-            } catch (error) {
-                return [];
-            }
+        saveState: (state) => {
+            const master = AppStorage._getMasterState();
+            master.quotes[master.activeQuoteId] = state;
+            AppStorage._saveMasterState(master);
         },
 
-        /**
-         * Guarda los contactos de correo.
-         */
-        saveContacts: (contacts) => {
-            localStorage.setItem(CONTACTS_KEY, JSON.stringify(contacts));
-        },
-
-        /**
-         * Obtiene los grupos de correo.
-         */
-        getGroups: () => {
-            try {
-                const groups = localStorage.getItem(GROUPS_KEY);
-                return groups ? JSON.parse(groups) : [];
-            } catch (error) {
-                return [];
-            }
-        },
-
-        /**
-         * Guarda los grupos de correo.
-         */
-        saveGroups: (groups) => {
-            localStorage.setItem(GROUPS_KEY, JSON.stringify(groups));
-        },
-
-        /**
-         * Obtiene la configuración de correo.
-         */
-        getSettings: () => {
-            try {
-                const settings = localStorage.getItem(SETTINGS_KEY);
-                return settings ? JSON.parse(settings) : {};
-            } catch (error) {
-                return {};
-            }
-        },
-
-        /**
-         * Guarda la configuración de correo.
-         */
-        saveSettings: (settings) => {
-            localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
-        },
-
-        /**
-         * Define la estructura inicial del estado.
-         */
         getInitialState: () => ({
             fields: {
-                fecha: '',
-                placa: '',
-                marca: '',
-                linea: '',
-                modelo: '',
-                color: '',
-                tipoCliente: '',
-                cilindraje: '',
-                vin: '',
-                nombreCompleto: ''
+                fecha: '', placa: '', marca: '', linea: '', modelo: '',
+                color: '', tipoCliente: '', cilindraje: '', vin: ''
             },
             quoteItems: [],
             naItems: [],
@@ -115,81 +138,78 @@
             photosDownloadedFor: ''
         }),
 
-        /**
-         * Guarda el estado completo en LocalStorage.
-         */
-        saveState: (state) => {
-            try {
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-            } catch (error) {
-                console.error('Error al guardar en LocalStorage:', error);
-            }
-        },
-
-        /**
-         * Limpia el estado de la cotización actual.
-         */
         clearState: () => {
-            localStorage.removeItem(STORAGE_KEY);
+            const master = AppStorage._getMasterState();
+            master.quotes[master.activeQuoteId] = AppStorage.getInitialState();
+            AppStorage._saveMasterState(master);
         },
 
-        /**
-         * Obtiene la placa actual del estado.
-         */
         getPlate: () => {
             const state = AppStorage.getState();
             return (state.fields?.placa || '').trim().toUpperCase();
         },
 
-        /**
-         * Actualiza solo los campos del vehículo.
-         */
         updateFields: (fields) => {
             const state = AppStorage.getState();
             state.fields = { ...state.fields, ...fields };
             AppStorage.saveState(state);
         },
 
-        /**
-         * Actualiza la lista de ítems de la cotización.
-         */
         updateQuoteItems: (items) => {
             const state = AppStorage.getState();
             state.quoteItems = items;
             AppStorage.saveState(state);
         },
 
-        /**
-         * Obtiene los ítems N/A (que no requieren foto).
-         */
         getNaIds: () => {
             const state = AppStorage.getState();
             return new Set(Array.isArray(state.naItems) ? state.naItems : []);
         },
 
-        /**
-         * Actualiza el estado de descarga de fotos.
-         */
+        saveNaIds: (idSet) => {
+            const state = AppStorage.getState();
+            state.naItems = Array.isArray(idSet) ? idSet : [...idSet];
+            AppStorage.saveState(state);
+        },
+
         setPhotosDownloaded: (status) => {
             const state = AppStorage.getState();
             state.photosDownloaded = !!status;
             AppStorage.saveState(state);
         },
 
-        /**
-         * Actualiza el estado de correo abierto.
-         */
         setEmailOpened: (status) => {
             const state = AppStorage.getState();
             state.emailOpened = !!status;
             AppStorage.saveState(state);
         },
 
-        // --- Gestión de IndexedDB (Fotos) ---
+        // --- Configuración Global ---
+        getContacts: () => {
+            try {
+                const contacts = localStorage.getItem(CONTACTS_KEY);
+                return contacts ? JSON.parse(contacts) : [];
+            } catch (error) { return []; }
+        },
+        saveContacts: (contacts) => localStorage.setItem(CONTACTS_KEY, JSON.stringify(contacts)),
 
-        /**
-         * Abre la conexión a IndexedDB.
-         */
+        getGroups: () => {
+            try {
+                const groups = localStorage.getItem(GROUPS_KEY);
+                return groups ? JSON.parse(groups) : [];
+            } catch (error) { return []; }
+        },
+        saveGroups: (groups) => localStorage.setItem(GROUPS_KEY, JSON.stringify(groups)),
+
+        getSettings: () => {
+            try {
+                const settings = localStorage.getItem(SETTINGS_KEY);
+                return settings ? JSON.parse(settings) : {};
+            } catch (error) { return {}; }
+        },
+        saveSettings: (settings) => localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)),
+
+        // --- IndexedDB ---
         openDB: () => {
             return new Promise((resolve, reject) => {
                 const request = indexedDB.open(DB_NAME, 1);
@@ -204,27 +224,16 @@
                 request.onerror = () => reject(request.error);
             });
         },
-
-        /**
-         * Guarda una foto en la base de datos.
-         */
         savePhoto: async (photoData) => {
             const db = await AppStorage.openDB();
             return new Promise((resolve, reject) => {
                 const transaction = db.transaction(STORE_NAME, 'readwrite');
                 const store = transaction.objectStore(STORE_NAME);
-                const request = store.put({
-                    ...photoData,
-                    createdAt: photoData.createdAt || Date.now()
-                });
+                const request = store.put({ ...photoData, createdAt: photoData.createdAt || Date.now() });
                 request.onsuccess = () => resolve(request.result);
                 request.onerror = () => reject(request.error);
             });
         },
-
-        /**
-         * Obtiene todas las fotos asociadas a una placa.
-         */
         getPhotosByPlate: async (placa) => {
             if (!placa) return [];
             const db = await AppStorage.openDB();
@@ -240,10 +249,6 @@
                 request.onerror = () => reject(request.error);
             });
         },
-
-        /**
-         * Elimina una foto por su ID.
-         */
         deletePhoto: async (id) => {
             const db = await AppStorage.openDB();
             return new Promise((resolve, reject) => {
@@ -254,10 +259,6 @@
                 request.onerror = () => reject(request.error);
             });
         },
-
-        /**
-         * Elimina todas las fotos de una placa específica.
-         */
         deletePhotosByPlate: async (placa) => {
             if (!placa) return;
             const db = await AppStorage.openDB();
@@ -268,17 +269,12 @@
                 const request = index.openCursor(placa.toUpperCase());
                 request.onsuccess = (event) => {
                     const cursor = event.target.result;
-                    if (cursor) {
-                        cursor.delete();
-                        cursor.continue();
-                    }
+                    if (cursor) { cursor.delete(); cursor.continue(); }
                 };
                 transaction.oncomplete = () => resolve();
                 transaction.onerror = () => reject(transaction.error);
             });
         }
     };
-
     window.AppStorage = AppStorage;
-
 })(window);

@@ -69,8 +69,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 color: colorInput.value.trim(),
                 tipoCliente: tipoClienteInput.value.trim(),
                 cilindraje: cilindrajeInput.value.trim(),
-                vin: vinInput.value.trim(),
-                nombreCompleto: nombreCompletoInput.value.trim()
+                vin: vinInput.value.trim()
             },
             quoteItems,
             naItems: Array.isArray(currentState.naItems) ? currentState.naItems.filter((id) => quoteItems.some((item) => item.id === id)) : [],
@@ -91,13 +90,14 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const updateUserDisplay = () => {
-        const userName = nombreCompletoInput.value.trim();
+        const userName = storage.getUserName();
         userNameDisplay.textContent = userName;
         userNameDisplay.title = userName ? 'Editar usuario' : '';
     };
 
     const openUserModal = () => {
         userModal.hidden = false;
+        nombreCompletoInput.value = storage.getUserName();
         nombreCompletoInput.focus();
     };
 
@@ -227,9 +227,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const loadState = () => {
         const state = storage.getState();
-        const hasData = state && (state.fields.nombreCompleto || state.fields.placa || (state.quoteItems && state.quoteItems.length > 0));
+        const userName = storage.getUserName();
 
-        if (!hasData) {
+        if (!userName) {
             updateUserDisplay();
             openUserModal();
             return;
@@ -247,7 +247,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 tipoClienteInput.value = state.fields.tipoCliente || '';
                 cilindrajeInput.value = state.fields.cilindraje || '';
                 vinInput.value = state.fields.vin || '';
-                nombreCompletoInput.value = state.fields.nombreCompleto || '';
             }
 
             quoteItems = (Array.isArray(state.quoteItems) ? state.quoteItems : []).map((item) => (item && item.id ? item : { ...item, id: storage.makeId() }));
@@ -261,9 +260,8 @@ document.addEventListener('DOMContentLoaded', () => {
         saveState();
         updateUserDisplay();
         updateQuoteCard();
-        if (!nombreCompletoInput.value.trim()) {
-            openUserModal();
-        } else if (!placaInput.value.trim()) {
+
+        if (!placaInput.value.trim()) {
             openQuoteModal();
         }
     };
@@ -277,8 +275,7 @@ document.addEventListener('DOMContentLoaded', () => {
         colorInput,
         tipoClienteInput,
         cilindrajeInput,
-        vinInput,
-        nombreCompletoInput,
+        vinInput
     ];
 
     const uppercaseFields = [placaInput, marcaInput, lineaInput, colorInput, tipoClienteInput];
@@ -310,7 +307,7 @@ document.addEventListener('DOMContentLoaded', () => {
     userForm.addEventListener('submit', (event) => {
         event.preventDefault();
         if (!userForm.reportValidity()) return;
-        saveState();
+        storage.setUserName(nombreCompletoInput.value.trim());
         closeUserModal();
         if (!placaInput.value.trim()) openQuoteModal();
     });
@@ -339,7 +336,6 @@ document.addEventListener('DOMContentLoaded', () => {
         tipoClienteInput.value = '';
         cilindrajeInput.value = '';
         vinInput.value = '';
-        updateUserDisplay();
         descripInput.value = '';
         cantInput.value = '';
         dymInput.value = '';
@@ -350,34 +346,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const handleNewQuote = () => {
         const state = storage.getState();
-        if (!state.photosDownloaded) {
-            showAlert('No puedes iniciar una nueva cotización sin antes haber descargado las imágenes.');
-            return;
-        }
-        if (!state.emailOpened) {
-            showAlert('No puedes iniciar una nueva cotización sin antes haber enviado el correo (abierto Gmail).');
-            return;
+        if (state.fields.placa) {
+            if (!state.photosDownloaded) {
+                showAlert('No puedes iniciar una nueva cotización sin antes haber descargado las imágenes.');
+                return;
+            }
+            if (!state.emailOpened) {
+                showAlert('No puedes iniciar una nueva cotización sin antes haber enviado el correo (abierto Gmail).');
+                return;
+            }
         }
         newQuoteWarningModal.hidden = false;
     };
 
     const confirmNewQuote = async () => {
-        const currentPlate = placaInput.value.trim().toUpperCase();
-        try {
-            await storage.deletePhotosByPlate(currentPlate);
-        } catch (error) {
-            newQuoteWarningModal.hidden = true;
-            alert('No se pudieron eliminar las fotos de la placa actual.');
-            return;
-        }
         newQuoteWarningModal.hidden = true;
+        storage.createNewQuote();
+
         quoteItems = [];
         resetFormFields();
-        storage.clearState();
-        // Aseguramos que el nuevo estado empiece limpio (flags en false)
-        const newState = storage.getInitialState();
-        newState.fields.nombreCompleto = nombreCompletoInput.value.trim(); // Preservar nombre del asesor
-        storage.saveState(newState);
 
         renderTable();
         addItemButton.textContent = 'Agregar';
