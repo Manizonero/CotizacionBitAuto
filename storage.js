@@ -25,17 +25,33 @@
         // --- Gestión de Sesiones Múltiples ---
         _getMasterState: () => {
             try {
-                const master = localStorage.getItem(STORAGE_KEY);
-                if (!master) return AppStorage._createInitialMaster();
-                const parsed = JSON.parse(master);
+                const masterStr = localStorage.getItem(STORAGE_KEY);
+                if (!masterStr) return AppStorage._createInitialMaster();
+
+                const parsed = JSON.parse(masterStr);
+
+                // MIGRACIÓN: Si es el formato antiguo (un solo objeto)
                 if (parsed.fields && !parsed.quotes) {
-                    const oldId = AppStorage.makeId();
+                    const oldId = 'legacy_' + AppStorage.makeId();
                     const migrated = { activeQuoteId: oldId, quotes: { [oldId]: parsed } };
                     AppStorage._saveMasterState(migrated);
                     return migrated;
                 }
+
+                // SEGURIDAD: Si no hay cotización activa o la activa no existe, forzar una
+                if (!parsed.activeQuoteId || !parsed.quotes[parsed.activeQuoteId]) {
+                    const keys = Object.keys(parsed.quotes || {});
+                    if (keys.length > 0) {
+                        parsed.activeQuoteId = keys[0];
+                        AppStorage._saveMasterState(parsed);
+                    } else {
+                        return AppStorage._createInitialMaster();
+                    }
+                }
+
                 return parsed;
             } catch (error) {
+                console.error('Error crítico en almacenamiento:', error);
                 return AppStorage._createInitialMaster();
             }
         },
@@ -73,31 +89,24 @@
             return newId;
         },
 
-        /**
-         * Finaliza/Elimina una cotización.
-         */
         deleteQuote: async (id) => {
             const master = AppStorage._getMasterState();
             const placa = master.quotes[id]?.fields?.placa;
             delete master.quotes[id];
 
-            if (master.activeQuoteId === id) {
-                const keys = Object.keys(master.quotes);
-                if (keys.length > 0) {
-                    master.activeQuoteId = keys[0];
-                } else {
-                    const newId = AppStorage.makeId();
-                    master.quotes[newId] = AppStorage.getInitialState();
-                    master.activeQuoteId = newId;
-                }
+            const keys = Object.keys(master.quotes);
+            if (keys.length > 0) {
+                master.activeQuoteId = keys[0];
+            } else {
+                const newId = AppStorage.makeId();
+                master.quotes[newId] = AppStorage.getInitialState();
+                master.activeQuoteId = newId;
             }
             AppStorage._saveMasterState(master);
 
             if (placa) {
                 const otherWithSamePlate = Object.values(master.quotes).some(q => q.fields?.placa === placa);
-                if (!otherWithSamePlate) {
-                    await AppStorage.deletePhotosByPlate(placa);
-                }
+                if (!otherWithSamePlate) await AppStorage.deletePhotosByPlate(placa);
             }
         },
 
@@ -123,6 +132,7 @@
 
         saveState: (state) => {
             const master = AppStorage._getMasterState();
+            if (!master.activeQuoteId) return;
             master.quotes[master.activeQuoteId] = state;
             AppStorage._saveMasterState(master);
         },
@@ -146,10 +156,7 @@
             AppStorage._saveMasterState(master);
         },
 
-        getPlate: () => {
-            const state = AppStorage.getState();
-            return (state.fields?.placa || '').trim().toUpperCase();
-        },
+        getPlate: () => AppStorage.getState().fields?.placa?.trim().toUpperCase() || '',
 
         updateFields: (fields) => {
             const state = AppStorage.getState();
@@ -163,14 +170,10 @@
             AppStorage.saveState(state);
         },
 
-        getNaIds: () => {
+        getNaIds: () => new Set(AppStorage.getState().naItems || []),
+        saveNaIds: (ids) => {
             const state = AppStorage.getState();
-            return new Set(Array.isArray(state.naItems) ? state.naItems : []);
-        },
-
-        saveNaIds: (idSet) => {
-            const state = AppStorage.getState();
-            state.naItems = Array.isArray(idSet) ? idSet : [...idSet];
+            state.naItems = Array.isArray(ids) ? ids : [...ids];
             AppStorage.saveState(state);
         },
 
@@ -186,113 +189,72 @@
             AppStorage.saveState(state);
         },
 
-        // --- Utilidades de UI ---
-        /**
-         * Resalta el icono activo en la navegación superior.
-         */
         highlightActiveNav: () => {
             const currentPath = window.location.pathname.split('/').pop() || 'index.html';
-            const navLinks = document.querySelectorAll('.top-nav .nav-ico');
-            navLinks.forEach(link => {
-                const linkPath = link.getAttribute('href');
-                if (linkPath === currentPath) {
-                    link.classList.add('active-nav');
-                } else {
-                    link.classList.remove('active-nav');
-                }
+            document.querySelectorAll('.top-nav .nav-ico').forEach(link => {
+                const path = link.getAttribute('href');
+                if (path === currentPath) link.classList.add('active-nav');
+                else link.classList.remove('active-nav');
             });
         },
 
         // --- Configuración Global ---
-        getContacts: () => {
-            try {
-                const contacts = localStorage.getItem(CONTACTS_KEY);
-                return contacts ? JSON.parse(contacts) : [];
-            } catch (error) { return []; }
-        },
-        saveContacts: (contacts) => localStorage.setItem(CONTACTS_KEY, JSON.stringify(contacts)),
-
-        getGroups: () => {
-            try {
-                const groups = localStorage.getItem(GROUPS_KEY);
-                return groups ? JSON.parse(groups) : [];
-            } catch (error) { return []; }
-        },
-        saveGroups: (groups) => localStorage.setItem(GROUPS_KEY, JSON.stringify(groups)),
-
-        getSettings: () => {
-            try {
-                const settings = localStorage.getItem(SETTINGS_KEY);
-                return settings ? JSON.parse(settings) : {};
-            } catch (error) { return {}; }
-        },
-        saveSettings: (settings) => localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)),
+        getContacts: () => JSON.parse(localStorage.getItem(CONTACTS_KEY) || '[]'),
+        saveContacts: (c) => localStorage.setItem(CONTACTS_KEY, JSON.stringify(c)),
+        getGroups: () => JSON.parse(localStorage.getItem(GROUPS_KEY) || '[]'),
+        saveGroups: (g) => localStorage.setItem(GROUPS_KEY, JSON.stringify(g)),
+        getSettings: () => JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}'),
+        saveSettings: (s) => localStorage.setItem(SETTINGS_KEY, JSON.stringify(s)),
 
         // --- IndexedDB ---
-        openDB: () => {
-            return new Promise((resolve, reject) => {
-                const request = indexedDB.open(DB_NAME, 1);
-                request.onupgradeneeded = (event) => {
-                    const db = event.target.result;
-                    if (!db.objectStoreNames.contains(STORE_NAME)) {
-                        const store = db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true });
-                        store.createIndex('placaVehiculo', 'placaVehiculo', { unique: false });
-                    }
-                };
-                request.onsuccess = () => resolve(request.result);
-                request.onerror = () => reject(request.error);
-            });
-        },
-        savePhoto: async (photoData) => {
+        openDB: () => new Promise((res, rej) => {
+            const req = indexedDB.open(DB_NAME, 1);
+            req.onupgradeneeded = (e) => {
+                const db = e.target.result;
+                if (!db.objectStoreNames.contains(STORE_NAME)) {
+                    const s = db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true });
+                    s.createIndex('placaVehiculo', 'placaVehiculo', { unique: false });
+                }
+            };
+            req.onsuccess = () => res(req.result);
+            req.onerror = () => rej(req.error);
+        }),
+        savePhoto: async (p) => {
             const db = await AppStorage.openDB();
-            return new Promise((resolve, reject) => {
-                const transaction = db.transaction(STORE_NAME, 'readwrite');
-                const store = transaction.objectStore(STORE_NAME);
-                const request = store.put({ ...photoData, createdAt: photoData.createdAt || Date.now() });
-                request.onsuccess = () => resolve(request.result);
-                request.onerror = () => reject(request.error);
+            return new Promise((res, rej) => {
+                const tx = db.transaction(STORE_NAME, 'readwrite');
+                tx.objectStore(STORE_NAME).put({ ...p, createdAt: p.createdAt || Date.now() });
+                tx.oncomplete = () => res();
+                tx.onerror = () => rej(tx.error);
             });
         },
         getPhotosByPlate: async (placa) => {
             if (!placa) return [];
             const db = await AppStorage.openDB();
-            return new Promise((resolve, reject) => {
-                const transaction = db.transaction(STORE_NAME, 'readonly');
-                const store = transaction.objectStore(STORE_NAME);
-                const index = store.index('placaVehiculo');
-                const request = index.getAll(placa.toUpperCase());
-                request.onsuccess = () => {
-                    const results = (request.result || []).filter(r => r.blob?.size > 0);
-                    resolve(results.sort((a, b) => a.createdAt - b.createdAt));
-                };
-                request.onerror = () => reject(request.error);
+            return new Promise((res, rej) => {
+                const req = db.transaction(STORE_NAME, 'readonly').objectStore(STORE_NAME).index('placaVehiculo').getAll(placa.toUpperCase());
+                req.onsuccess = () => res((req.result || []).filter(r => r.blob?.size > 0).sort((a, b) => a.createdAt - b.createdAt));
+                req.onerror = () => rej(req.error);
             });
         },
         deletePhoto: async (id) => {
             const db = await AppStorage.openDB();
-            return new Promise((resolve, reject) => {
-                const transaction = db.transaction(STORE_NAME, 'readwrite');
-                const store = transaction.objectStore(STORE_NAME);
-                const request = store.delete(id);
-                request.onsuccess = () => resolve();
-                request.onerror = () => reject(request.error);
+            return new Promise((res, rej) => {
+                const req = db.transaction(STORE_NAME, 'readwrite').objectStore(STORE_NAME).delete(id);
+                req.onsuccess = () => res();
+                req.onerror = () => rej(req.error);
             });
         },
         deletePhotosByPlate: async (placa) => {
             if (!placa) return;
             const db = await AppStorage.openDB();
-            return new Promise((resolve, reject) => {
-                const transaction = db.transaction(STORE_NAME, 'readwrite');
-                const store = transaction.objectStore(STORE_NAME);
-                const index = store.index('placaVehiculo');
-                const request = index.openCursor(placa.toUpperCase());
-                request.onsuccess = (event) => {
-                    const cursor = event.target.result;
-                    if (cursor) { cursor.delete(); cursor.continue(); }
-                };
-                transaction.oncomplete = () => resolve();
-                transaction.onerror = () => reject(transaction.error);
-            });
+            const tx = db.transaction(STORE_NAME, 'readwrite');
+            const idx = tx.objectStore(STORE_NAME).index('placaVehiculo');
+            idx.openCursor(placa.toUpperCase()).onsuccess = (e) => {
+                const c = e.target.result;
+                if (c) { c.delete(); c.continue(); }
+            };
+            return new Promise(res => { tx.oncomplete = res; });
         }
     };
     window.AppStorage = AppStorage;
