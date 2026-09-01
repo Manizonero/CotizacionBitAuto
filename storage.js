@@ -30,7 +30,6 @@
 
                 const parsed = JSON.parse(masterStr);
 
-                // MIGRACIÓN: Si es el formato antiguo (un solo objeto)
                 if (parsed.fields && !parsed.quotes) {
                     const oldId = 'legacy_' + AppStorage.makeId();
                     const migrated = { activeQuoteId: oldId, quotes: { [oldId]: parsed } };
@@ -38,7 +37,6 @@
                     return migrated;
                 }
 
-                // SEGURIDAD: Si no hay cotización activa o la activa no existe, forzar una
                 if (!parsed.activeQuoteId || !parsed.quotes[parsed.activeQuoteId]) {
                     const keys = Object.keys(parsed.quotes || {});
                     if (keys.length > 0) {
@@ -51,7 +49,6 @@
 
                 return parsed;
             } catch (error) {
-                console.error('Error crítico en almacenamiento:', error);
                 return AppStorage._createInitialMaster();
             }
         },
@@ -89,24 +86,41 @@
             return newId;
         },
 
+        /**
+         * Borrado Blindado: Elimina la cotización de LocalStorage PRIMERO
+         * para que desaparezca de la vista del usuario inmediatamente.
+         */
         deleteQuote: async (id) => {
             const master = AppStorage._getMasterState();
-            const placa = master.quotes[id]?.fields?.placa;
+            const quoteData = master.quotes[id];
+            if (!quoteData) return;
+
+            const placa = quoteData.fields?.placa;
+
+            // 1. Eliminar del objeto maestro
             delete master.quotes[id];
 
-            const keys = Object.keys(master.quotes);
-            if (keys.length > 0) {
-                master.activeQuoteId = keys[0];
-            } else {
-                const newId = AppStorage.makeId();
-                master.quotes[newId] = AppStorage.getInitialState();
-                master.activeQuoteId = newId;
+            // 2. Gestionar el ID activo si acabamos de borrar el actual
+            if (master.activeQuoteId === id) {
+                const keys = Object.keys(master.quotes);
+                if (keys.length > 0) {
+                    master.activeQuoteId = keys[0];
+                } else {
+                    const newId = AppStorage.makeId();
+                    master.quotes[newId] = AppStorage.getInitialState();
+                    master.activeQuoteId = newId;
+                }
             }
+
+            // 3. Guardar en LocalStorage (esto actualiza la UI al refrescar)
             AppStorage._saveMasterState(master);
 
+            // 4. Limpiar fotos en segundo plano (sin bloquear el hilo principal)
             if (placa) {
                 const otherWithSamePlate = Object.values(master.quotes).some(q => q.fields?.placa === placa);
-                if (!otherWithSamePlate) await AppStorage.deletePhotosByPlate(placa);
+                if (!otherWithSamePlate) {
+                    AppStorage.deletePhotosByPlate(placa).catch(e => console.error("Error borrando fotos:", e));
+                }
             }
         },
 
@@ -254,7 +268,7 @@
                 const c = e.target.result;
                 if (c) { c.delete(); c.continue(); }
             };
-            return new Promise(res => { tx.oncomplete = res; });
+            return new Promise((res) => { tx.oncomplete = () => res(); tx.onerror = () => res(); });
         }
     };
     window.AppStorage = AppStorage;
