@@ -21,7 +21,24 @@
 
     const escapeHtml = (v) => String(v || '-').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-    // Genera el contenido HTML para copiar (Saludo + Tablas)
+    // Genera versión en TEXTO PLANO para el portapapeles (Respaldo)
+    const getPlainTextBody = () => {
+        const state = storage.getState();
+        const f = state.fields || {};
+        const items = state.quoteItems || [];
+        const greeting = storage.getSettings().greeting || 'Cordial saludo,';
+
+        let text = `${greeting}\n\n`;
+        text += `DATOS DEL VEHICULO\n`;
+        text += `Fecha: ${f.fecha}\nPlaca: ${f.placa}\nMarca: ${f.marca}\nLinea: ${f.linea}\n\n`;
+        text += `REPUESTOS SOLICITADOS\n`;
+        items.forEach((item, i) => {
+            text += `${i+1}. ${item.descrip} | Cant: ${item.cant} | Estado: ${item.estado}\n`;
+        });
+        return text;
+    };
+
+    // Genera versión en HTML para el portapapeles (Tabla con formato)
     const richBody = () => {
         const state = storage.getState();
         const fields = state.fields || {};
@@ -49,14 +66,14 @@
             </tr>`;
         }).join('') : '<tr><td colspan="7" style="border:1px solid #000;padding:6px;">No hay repuestos registrados.</td></tr>';
 
-        const cellStyle = 'border:1px solid #000;padding:8px;font-weight:bold;background-color:#c6dcf0;text-align:left;';
+        const headerStyle = 'border:1px solid #000;padding:8px;font-weight:bold;background-color:#c6dcf0;text-align:left;';
 
         return `<div style="font-family:Arial,sans-serif;color:#000;">
                 <p>${escapeHtml(greeting).replace(/\n/g, '<br>')}</p>
                 <br>
                 <strong>DATOS DEL VEHICULO</strong><br>
                 <table border="1" cellspacing="0" cellpadding="5" style="border-collapse:collapse;width:100%;font-family:Arial,sans-serif;font-size:14px;margin-top:5px;">
-                    <tr><th style="${cellStyle}">Fecha</th><th style="${cellStyle}">Placa</th><th style="${cellStyle}">Marca</th><th style="${cellStyle}">Linea</th></tr>
+                    <tr><th style="${headerStyle}">Fecha</th><th style="${headerStyle}">Placa</th><th style="${headerStyle}">Marca</th><th style="${headerStyle}">Linea</th></tr>
                     <tr><td style="border:1px solid #000;padding:6px;">${escapeHtml(fields.fecha)}</td><td style="border:1px solid #000;padding:6px;">${escapeHtml(fields.placa)}</td><td style="border:1px solid #000;padding:6px;">${escapeHtml(fields.marca)}</td><td style="border:1px solid #000;padding:6px;">${escapeHtml(fields.linea)}</td></tr>
                 </table>
                 <br>
@@ -71,18 +88,14 @@
     const updatePreview = () => {
         const state = storage.getState();
         const f = state.fields || {};
-
         const subInput = $('subjectInput');
         if (subInput) subInput.value = getSubjectText();
-
         const label = $('mailVehicleLabel');
         if (label) label.textContent = `${f.marca || '-'} ${f.linea || '-'} / ${f.placa || '-'}`;
-
         const body = $('mailItemsTableBody');
         if (body) {
             body.innerHTML = '';
-            const items = state.quoteItems || [];
-            items.forEach((item, index) => {
+            (state.quoteItems || []).forEach((item, index) => {
                 const row = document.createElement('tr');
                 [String(index + 1), item.descrip, item.cant, item.estado, item.pint, item.dat].forEach(text => {
                     const td = document.createElement('td');
@@ -94,95 +107,33 @@
         }
     };
 
-    const renderContacts = () => {
-        const list = $('contactsList');
-        if (!list) return;
-        list.innerHTML = '';
-        contacts.forEach((contact, index) => {
-            const row = document.createElement('div');
-            row.className = 'contact-row';
-            row.innerHTML = `
-                <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;"><strong>${contact.name}</strong><br><small>${contact.email}</small></span>
-                <button type="button" class="contact-action edit-contact" data-idx="${index}">Editar</button>
-                <button type="button" class="contact-action delete-contact" data-idx="${index}" style="background:#fff0f2;color:#b52d40;">Borrar</button>
-            `;
-            list.appendChild(row);
-        });
-    };
-
-    const renderGroups = () => {
-        const list = $('groupsList');
-        if (!list) return;
-        list.innerHTML = '';
-        groups.forEach((group, index) => {
-            const row = document.createElement('div');
-            row.className = 'contact-row';
-            row.innerHTML = `
-                <span style="flex:1;"><strong>${group.name}</strong><br><small>${group.emails.length} correos</small></span>
-                <button type="button" class="contact-action edit-group" data-idx="${index}">Editar</button>
-                <button type="button" class="contact-action delete-group" data-idx="${index}" style="background:#fff0f2;color:#b52d40;">Borrar</button>
-            `;
-            list.appendChild(row);
-        });
-    };
-
-    const renderGroupContactsSelector = (selectedEmails = []) => {
-        const list = $('groupContactsList');
-        if (!list) return;
-        list.innerHTML = contacts.length ? '' : '<p class="muted">No hay contactos registrados.</p>';
-        contacts.forEach(c => {
-            const label = document.createElement('label');
-            label.style.display = 'flex';
-            label.style.alignItems = 'center';
-            label.style.gap = '8px';
-            label.innerHTML = `<input type="checkbox" value="${c.email}" ${selectedEmails.includes(c.email) ? 'checked' : ''}> ${c.name}`;
-            list.appendChild(label);
-        });
-    };
-
-    const updateGroupSelector = () => {
-        const sel = $('groupSelector');
-        if (!sel) return;
-        const old = sel.value;
-        sel.innerHTML = '<option value="">Selecciona un grupo...</option>';
-        groups.forEach((g, i) => {
-            const opt = document.createElement('option');
-            opt.value = i; opt.textContent = g.name;
-            sel.appendChild(opt);
-        });
-        sel.value = old;
-    };
-
-    const copyToClipboard = async (html) => {
+    const copyToClipboard = async (html, plain) => {
         try {
-            // Método moderno para navegadores que lo soportan
+            // Intento 1: API Moderna (Requiere HTTPS y contexto seguro)
             if (navigator.clipboard && window.ClipboardItem) {
-                const blob = new Blob([html], { type: 'text/html' });
-                const item = new ClipboardItem({ 'text/html': blob });
-                await navigator.clipboard.write([item]);
+                const data = [new ClipboardItem({
+                    'text/html': new Blob([html], { type: 'text/html' }),
+                    'text/plain': new Blob([plain], { type: 'text/plain' })
+                })];
+                await navigator.clipboard.write(data);
                 return true;
             }
-        } catch (err) {
-            console.error('Fallo clipboard API:', err);
-        }
+        } catch (e) { console.error('Clipboard API failed', e); }
 
-        // Método de respaldo (fallback) con div temporal - muy confiable
+        // Intento 2: Fallback Clásico (Para móviles y navegadores antiguos)
         const container = document.createElement('div');
         container.innerHTML = html;
         container.style.position = 'fixed';
         container.style.left = '-9999px';
-        container.style.top = '0';
-        container.contentEditable = true;
         document.body.appendChild(container);
-
         const range = document.createRange();
         range.selectNodeContents(container);
-        const selection = window.getSelection();
-        selection.removeAllRanges();
-        selection.addRange(range);
-
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
         const success = document.execCommand('copy');
         document.body.removeChild(container);
+        sel.removeAllRanges();
         return success;
     };
 
@@ -200,11 +151,11 @@
 
         $('tabContacts').onclick = () => {
             $('contactsSection').hidden = false; $('groupsSection').hidden = true;
-            $('tabContacts').className = 'primary'; $('tabGroups').className = 'secondary';
+            $('tabContacts').className = 'button primary'; $('tabGroups').className = 'button secondary';
         };
         $('tabGroups').onclick = () => {
             $('contactsSection').hidden = true; $('groupsSection').hidden = false;
-            $('tabGroups').className = 'primary'; $('tabContacts').className = 'secondary';
+            $('tabGroups').className = 'button primary'; $('tabContacts').className = 'button secondary';
             renderGroupContactsSelector();
         };
 
@@ -229,7 +180,7 @@
         $('groupForm').onsubmit = (e) => {
             e.preventDefault();
             const selected = Array.from($('groupContactsList').querySelectorAll('input:checked')).map(cb => cb.value);
-            if (!selected.length) { alert('Elige al menos un contacto.'); return; }
+            if (!selected.length) return;
             const g = { name: $('groupName').value.trim(), emails: selected };
             if (editingGroupIndex === null) groups.push(g); else groups[editingGroupIndex] = g;
             storage.saveGroups(groups); renderGroups(); $('groupForm').hidden = true;
@@ -252,21 +203,22 @@
             const group = groups[idx];
             const recipients = group.emails.join(',');
             const subject = getSubjectText();
-
             const html = richBody();
-            const copied = await copyToClipboard(html);
+            const plain = getPlainTextBody();
 
-            storage.setEmailOpened(true);
-            const webUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(recipients)}&su=${encodeURIComponent(subject)}`;
+            // Copiar al portapapeles con feedback
+            const copied = await copyToClipboard(html, plain);
 
             if (copied) {
-                $('mailStatus').textContent = '¡Saludo y Tabla copiados! Pégalos en Gmail.';
+                $('mailStatus').textContent = '¡Datos copiados! Pégalos en Gmail.';
                 $('mailStatus').style.color = '#17643a';
             } else {
-                $('mailStatus').textContent = 'Error al copiar. Intenta copiar manualmente.';
+                $('mailStatus').textContent = 'Error al copiar automáticamente.';
                 $('mailStatus').style.color = '#b52d40';
             }
 
+            storage.setEmailOpened(true);
+            const webUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(recipients)}&su=${encodeURIComponent(subject)}`;
             const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
             if (isMobile) {
                 const q = `to=${encodeURIComponent(recipients)}&subject=${encodeURIComponent(subject)}`;
