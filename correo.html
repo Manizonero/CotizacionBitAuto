@@ -27,7 +27,7 @@
             <div id="groupRecipients" class="muted" style="margin-top: 8px; font-size: 0.9rem;"></div>
         </section>
         <section class="mail-panel">
-            <div class="panel-title"><div><p class="eyebrow">DESTINATARIOS</p><h2>Gestionar contactos y grupos</h2><p id="selectedRecipients" class="muted">Ningun correo seleccionado</p></div><button id="openRecipientsBtn" class="button primary">Configurar</button></div>
+            <div class="panel-title"><div><p class="eyebrow">DESTINATARIOS</p><h2>Gestionar contactos y grupos</h2><p id="selectedRecipients" class="muted">Configura tus correos de envío.</p></div><button id="openRecipientsBtn" class="button primary">Configurar</button></div>
         </section>
         <section class="mail-panel">
             <label class="field-label" for="greetingInput">SALUDO</label>
@@ -43,26 +43,58 @@
             <p id="mailStatus" aria-live="polite"></p>
         </section>
     </main>
+
     <div id="recipientsModal" class="modal-backdrop" hidden>
         <section class="recipients-modal">
-            <div class="modal-heading"><h2>Contactos y Grupos</h2><button id="closeRecipientsBtn">&#10005;</button></div>
-            <div class="modal-tabs"><button id="tabContacts">Contactos</button><button id="tabGroups">Grupos</button></div>
+            <div class="modal-heading">
+                <div><p class="eyebrow">AJUSTES</p><h2>Destinatarios</h2></div>
+                <button id="closeRecipientsBtn" class="close-button">&times;</button>
+            </div>
+
+            <div class="modal-tabs">
+                <button id="tabContacts" class="primary">Contactos</button>
+                <button id="tabGroups" class="secondary">Grupos</button>
+            </div>
+
             <div id="contactsSection">
-                <div id="contactsList"></div><button id="addContactBtn">+</button>
-                <form id="contactForm" hidden><input id="contactName" placeholder="Nombre"><input id="contactEmail" placeholder="Email"><button type="submit">OK</button></form>
+                <div id="contactsList" class="contacts-list"></div>
+                <button id="addContactBtn" class="add-contact-button">+</button>
+                <form id="contactForm" class="contact-form" hidden>
+                    <input id="contactName" class="wide-input" placeholder="Nombre" required>
+                    <input id="contactEmail" class="wide-input" type="email" placeholder="Email" required>
+                    <div class="form-actions">
+                        <button type="button" id="cancelContactBtn" class="button secondary">Cancelar</button>
+                        <button type="submit" class="button primary">OK</button>
+                    </div>
+                </form>
             </div>
+
             <div id="groupsSection" hidden>
-                <div id="groupsList"></div><button id="addGroupBtn">+</button>
-                <form id="groupForm" hidden><input id="groupName" placeholder="Grupo"><div id="groupContactsList"></div><button type="submit">OK</button></form>
+                <div id="groupsList" class="contacts-list"></div>
+                <button id="addGroupBtn" class="add-contact-button">+</button>
+                <form id="groupForm" class="contact-form" hidden>
+                    <input id="groupName" class="wide-input" placeholder="Nombre del Grupo" required>
+                    <p class="eyebrow" style="margin-top: 10px;">SELECCIONA CORREOS:</p>
+                    <div id="groupContactsList" class="group-contacts-selector"></div>
+                    <div class="form-actions">
+                        <button type="button" id="cancelGroupBtn" class="button secondary">Cancelar</button>
+                        <button type="submit" class="button primary">OK</button>
+                    </div>
+                </form>
             </div>
-            <button id="saveRecipientsBtn">Listo</button>
+
+            <button id="saveRecipientsBtn" class="button primary modal-save-button">LISTO</button>
         </section>
     </div>
+
     <div id="alertModal" class="modal-backdrop" hidden>
-        <section class="recipients-modal">
-            <h2>ATENCIÓN</h2><p id="alertMessage"></p><button id="closeAlertBtn">Entendido</button>
+        <section class="recipients-modal" style="text-align: center;">
+            <h2>ATENCIÓN</h2>
+            <p id="alertMessage" style="margin: 20px 0;"></p>
+            <button id="closeAlertBtn" class="button primary" style="width: 100%;">Entendido</button>
         </section>
     </div>
+
     <script src="storage.js"></script>
     <script src="correo.js"></script>
 </body>
