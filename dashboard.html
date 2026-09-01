@@ -72,6 +72,17 @@
             font-size: 0.85rem;
             font-weight: 600;
         }
+        .delete-btn {
+            background: #fff0f2;
+            color: #b52d40;
+            border: 1px solid #fcc;
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+        .delete-btn:hover { background: #ffe0e2; }
         .new-btn-container {
             display: flex;
             justify-content: flex-end;
@@ -105,12 +116,13 @@
         <div id="quoteList" class="quote-list"></div>
     </div>
 
-    <div id="finalizeModal" class="user-modal" hidden>
+    <div id="deleteModal" class="user-modal" hidden>
         <div class="user-modal-content">
-            <h2>¿Finalizar cotización?</h2>
+            <h2 style="color: #b52d40;">¿Eliminar cotización?</h2>
+            <p>Se borrarán todos los datos de esta cotización de forma permanente y no hay forma de recuperarlos.</p>
             <div class="new-quote-warning-actions" style="margin-top: 20px;">
-                <button id="cancelFinalizeBtn" class="secondary-button">Cancelar</button>
-                <button id="confirmFinalizeBtn" class="secondary-button warning-button">Sí, Finalizar</button>
+                <button id="cancelDeleteBtn" class="secondary-button">Cancelar</button>
+                <button id="confirmDeleteBtn" class="secondary-button warning-button">Eliminar permanentemente</button>
             </div>
         </div>
     </div>
