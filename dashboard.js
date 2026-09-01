@@ -43,7 +43,7 @@
             item.addEventListener('click', (e) => {
                 if (e.target.closest('button')) return;
                 storage.setActiveQuote(quote.id);
-                window.location.href = 'index.html';
+                window.location.replace('index.html'); // Usar replace para no guardar historial
             });
 
             const finBtn = item.querySelector('.finalize-btn');
@@ -80,7 +80,7 @@
             return;
         }
         storage.createNewQuote();
-        window.location.href = 'index.html';
+        window.location.replace('index.html'); // Usar replace
     });
 
     $('cancelDeleteBtn').addEventListener('click', () => {

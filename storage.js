@@ -1,6 +1,5 @@
 /**
  * storage.js - Centralización del estado y persistencia (LocalStorage e IndexedDB)
- * VERSIÓN: 2.0 (Corregido índice de búsqueda de fotos)
  */
 (function(window) {
     'use strict';
@@ -11,7 +10,7 @@
     const SETTINGS_KEY = 'coticarEmailSettings';
     const GLOBAL_USER_KEY = 'coticarGlobalUser';
     const DB_NAME = 'TallerDB';
-    const DB_VERSION = 2; // Bumped to 2 to force index creation
+    const DB_VERSION = 2;
     const STORE_NAME = 'inspecciones';
 
     const AppStorage = {
@@ -132,7 +131,8 @@
         highlightActiveNav: () => {
             const currentPath = window.location.pathname.split('/').pop() || 'index.html';
             document.querySelectorAll('.top-nav .nav-ico').forEach(link => {
-                if (link.getAttribute('href') === currentPath) link.classList.add('active-nav');
+                const href = link.getAttribute('href');
+                if (href === currentPath) link.classList.add('active-nav');
                 else link.classList.remove('active-nav');
             });
         },
@@ -167,9 +167,9 @@
             return new Promise((resolve, reject) => {
                 const tx = db.transaction(STORE_NAME, 'readwrite');
                 const store = tx.objectStore(STORE_NAME);
-                const req = store.put({ ...photoData, createdAt: photoData.createdAt || Date.now() });
-                req.onsuccess = () => resolve();
-                req.onerror = () => reject(req.error);
+                store.put({ ...photoData, createdAt: photoData.createdAt || Date.now() });
+                tx.oncomplete = () => resolve();
+                tx.onerror = () => reject(tx.error);
             });
         },
 
@@ -181,12 +181,12 @@
                 const store = tx.objectStore(STORE_NAME);
                 if (!store.indexNames.contains('placaVehiculo')) { resolve([]); return; }
                 const index = store.index('placaVehiculo');
-                const req = index.getAll(placa.toUpperCase());
-                req.onsuccess = () => {
-                    const results = (req.result || []).filter(r => r && r.blob && r.blob.size > 0);
+                const request = index.getAll(placa.toUpperCase());
+                request.onsuccess = () => {
+                    const results = (request.result || []).filter(r => r && r.blob && r.blob.size > 0);
                     resolve(results.sort((a, b) => a.createdAt - b.createdAt));
                 };
-                req.onerror = () => reject(req.error);
+                request.onerror = () => reject(req.error);
             });
         },
 
@@ -215,5 +215,17 @@
             });
         }
     };
+
+    // --- Motor de Navegación sin Historial ---
+    // Intercepta todos los clics en enlaces internos para usar replace
+    document.addEventListener('click', e => {
+        const link = e.target.closest('a');
+        if (link && link.href && link.href.startsWith(window.location.origin) && !link.getAttribute('download')) {
+            // Evitar que guarde historial para que "Atrás" salga de la web
+            e.preventDefault();
+            window.location.replace(link.href);
+        }
+    });
+
     window.AppStorage = AppStorage;
 })(window);

@@ -4,14 +4,15 @@
   "description": "Extensión de BitAuto para gestión de cotizaciones e inspecciones",
   "start_url": "dashboard.html",
   "display": "standalone",
-  "background_color": "#eef3fb",
+  "background_color": "#ffffff",
   "theme_color": "#315ddc",
+  "orientation": "portrait",
   "icons": [
     {
       "src": "assets/app_icon_512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     }
   ]
 }

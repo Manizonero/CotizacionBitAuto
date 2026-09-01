@@ -72,9 +72,6 @@ document.addEventListener('DOMContentLoaded', () => {
             photosDownloadedFor: currentState.photosDownloadedFor || ''
         };
         storage.saveState(state);
-        const placaParam = encodeURIComponent(placaInput.value.trim().toUpperCase());
-        const marcaParam = encodeURIComponent(marcaInput.value.trim());
-        if (photosLink) photosLink.href = `fotos.html?placa=${placaParam}&marca=${marcaParam}`;
     };
 
     const getToday = () => {
@@ -128,14 +125,6 @@ document.addEventListener('DOMContentLoaded', () => {
         quoteItems.forEach((item, index) => {
             const row = itemsTableBody.insertRow();
             row.dataset.index = index; row.draggable = true;
-            row.addEventListener('dragstart', handleDragStart);
-            row.addEventListener('dragover', handleDragOver);
-            row.addEventListener('dragleave', handleDragLeave);
-            row.addEventListener('drop', handleDrop);
-            row.addEventListener('dragend', handleDragEnd);
-            row.addEventListener('touchstart', handleTouchStart);
-            row.addEventListener('touchmove', handleTouchMove);
-            row.addEventListener('touchend', handleTouchEnd);
             row.insertCell().textContent = item.descrip;
             row.insertCell().textContent = item.cant;
             row.insertCell().textContent = item.estado;
@@ -160,18 +149,10 @@ document.addEventListener('DOMContentLoaded', () => {
         saveState();
     };
 
-    const updatePartSuggestions = (filter = '') => {
-        if (!repuestosList) return;
-        const q = filter.trim().toLowerCase();
-        const ds = [...new Set(quoteItems.map(i => i.descrip).filter(Boolean))].filter(d => d.toLowerCase().includes(q));
-        repuestosList.innerHTML = '';
-        ds.forEach(d => { const o = document.createElement('option'); o.value = d; repuestosList.appendChild(o); });
-    };
-
     const loadState = () => {
         const activeId = storage.getActiveQuoteId();
         if (!activeId) {
-            window.location.href = 'dashboard.html';
+            window.location.replace('dashboard.html');
             return;
         }
 
@@ -205,34 +186,17 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    descripInput.addEventListener('input', () => updatePartSuggestions(descripInput.value));
     userForm.addEventListener('submit', (e) => { e.preventDefault(); storage.setUserName(nombreCompletoInput.value.trim()); userModal.hidden = true; loadState(); });
     editQuoteBtn.addEventListener('click', () => openQuoteModal(true));
     cancelQuoteBtn?.addEventListener('click', async () => {
         const s = storage.getState();
         if (!s.fields.placa) await storage.deleteQuote(storage.getActiveQuoteId());
-        window.location.href = 'dashboard.html';
+        window.location.replace('dashboard.html');
     });
-    quoteForm.addEventListener('submit', (e) => { e.preventDefault(); fechaInput.value = getToday(); saveState(); updateQuoteCard(); quoteModal.hidden = true; window.location.href = 'generales.html'; });
+    quoteForm.addEventListener('submit', (e) => { e.preventDefault(); fechaInput.value = getToday(); saveState(); updateQuoteCard(); quoteModal.hidden = true; window.location.replace('generales.html'); });
     confirmDeleteItemBtn.onclick = () => { quoteItems.splice(itemPendingDelete, 1); itemPendingDelete = null; deleteItemModal.hidden = true; renderTable(); };
     cancelDeleteItemBtn.onclick = () => { itemPendingDelete = null; deleteItemModal.hidden = true; };
     marcaInput.addEventListener('input', toggleFields);
-
-    let draggedRow = null;
-    function handleDragStart() { draggedRow = this; this.classList.add('dragging'); }
-    function handleDragOver(e) { e.preventDefault(); this.classList.add('drop-target'); }
-    function handleDragLeave() { this.classList.remove('drop-target'); }
-    function handleDrop(e) {
-        e.preventDefault(); this.classList.remove('drop-target');
-        const from = parseInt(draggedRow.dataset.index), to = parseInt(this.dataset.index);
-        const [item] = quoteItems.splice(from, 1); quoteItems.splice(to, 0, item); renderTable();
-    }
-    function handleDragEnd() { this.classList.remove('dragging'); }
-
-    let lpTimer = null, isTDrag = false;
-    function handleTouchStart() { lpTimer = setTimeout(() => { isTDrag = true; this.classList.add('dragging'); if (navigator.vibrate) navigator.vibrate(50); }, 400); }
-    function handleTouchMove(e) { if (!isTDrag) { clearTimeout(lpTimer); return; } e.preventDefault(); const t = e.touches[0], tar = document.elementFromPoint(t.clientX, t.clientY)?.closest('tr'); if (tar && tar.closest('tbody')) { document.querySelectorAll('.drop-target').forEach(el => el.classList.remove('drop-target')); tar.classList.add('drop-target'); } }
-    function handleTouchEnd() { clearTimeout(lpTimer); if (isTDrag) { const tar = document.querySelector('.drop-target'); if (tar) { const from = parseInt(draggedRow.dataset.index), to = parseInt(tar.dataset.index); const [item] = quoteItems.splice(from, 1); quoteItems.splice(to, 0, item); renderTable(); } } isTDrag = false; if (draggedRow) draggedRow.classList.remove('dragging'); document.querySelectorAll('.drop-target').forEach(el => el.classList.remove('drop-target')); }
 
     addItemButton.addEventListener('click', () => {
         const d = descripInput.value.trim(); if (!d) { showAlert('Descripción obligatoria'); return; }
