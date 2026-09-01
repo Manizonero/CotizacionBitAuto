@@ -45,9 +45,14 @@
     async function refresh() {
         const plate = getPlate();
         if (plate) {
-            const allPhotos = await storage.getPhotosByPlate(plate);
-            // Filtramos solo las fotos generales (sin repuestoId)
-            photos = allPhotos.filter(p => !p.repuestoId);
+            try {
+                const allPhotos = await storage.getPhotosByPlate(plate);
+                // Las fotos generales son las que no tienen repuestoId
+                photos = allPhotos.filter(p => !p.repuestoId);
+            } catch (e) {
+                console.error("Refresh error", e);
+                photos = [];
+            }
         } else {
             photos = [];
         }
@@ -96,11 +101,14 @@
 
     async function processFiles(event, openDetail) {
         const plate = getPlate();
-        if (!plate) { setStatus('No hay placa activa para guardar fotos.'); return; }
+        if (!plate) { setStatus('No hay placa activa.'); return; }
+
+        const files = Array.from(event.target.files);
+        if (!files.length) return;
 
         try {
-            for (const file of event.target.files) {
-                // Usamos la placa como etiqueta para la foto general
+            setStatus(`Guardando ${files.length} foto(s)...`);
+            for (const file of files) {
                 const blob = await compress(file, plate);
                 await storage.savePhoto({
                     placaVehiculo: plate,
@@ -109,10 +117,13 @@
                     createdAt: Date.now()
                 });
             }
-            await refresh();
-            if (openDetail && photos.length) openEditor(photos[photos.length - 1]);
+            // Espera obligatoria para IndexedDB
+            setTimeout(async () => {
+                await refresh();
+                if (openDetail && photos.length) openEditor(photos[photos.length - 1]);
+            }, 150);
         } catch (error) {
-            setStatus(`Error al guardar: ${error.message}`);
+            setStatus(`Error: ${error.message}`);
         }
         event.target.value = '';
     }
@@ -131,23 +142,26 @@
                 URL.revokeObjectURL(url);
 
                 if (label) {
-                    const fontSize = Math.max(12, Math.floor(canvas.width / 55));
-                    ctx.font = `700 ${fontSize}px Oxanium, sans-serif`;
-                    const textWidth = ctx.measureText(label).width;
-                    const pad = Math.max(4, Math.floor(canvas.width * 0.012));
-                    const lineHeight = Math.ceil(fontSize * 1.35);
-                    const boxX = canvas.width - textWidth - pad * 2;
-                    const boxW = textWidth + pad * 2;
-                    const boxH = lineHeight + pad * 2;
-                    const boxY = canvas.height - boxH;
-                    ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
-                    ctx.fillRect(boxX, boxY, boxW, boxH);
-                    ctx.fillStyle = '#111827';
-                    ctx.textBaseline = 'middle';
-                    ctx.fillText(label, boxX + pad, boxY + pad + lineHeight / 2);
+                    try {
+                        const fontSize = Math.max(12, Math.floor(canvas.width / 55));
+                        ctx.font = `700 ${fontSize}px Oxanium, sans-serif`;
+                        const textWidth = ctx.measureText(label).width;
+                        const pad = Math.max(4, Math.floor(canvas.width * 0.012));
+                        const lineHeight = Math.ceil(fontSize * 1.35);
+                        const boxX = canvas.width - textWidth - pad * 2;
+                        const boxW = textWidth + pad * 2;
+                        const boxH = lineHeight + pad * 2;
+                        const boxY = canvas.height - boxH;
+                        ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+                        ctx.fillRect(boxX, boxY, boxW, boxH);
+                        ctx.fillStyle = '#111827';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillText(label, boxX + pad, boxY + pad + lineHeight / 2);
+                    } catch(e) {}
                 }
-
-                canvas.toBlob(resolve, 'image/jpeg', JPEG_QUALITY);
+                canvas.toBlob((b) => {
+                    if (b) resolve(b); else reject(new Error("Error imagen"));
+                }, 'image/jpeg', JPEG_QUALITY);
             };
             image.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Imagen no válida')); };
             image.src = url;
@@ -309,13 +323,9 @@
                 const p = pointFromEvent(e);
                 movingAnnotation = annotationAt(p);
                 if (movingAnnotation) {
-                    if (movingAnnotation.type === 'circle') {
-                        moveOffset = { x: p.x - movingAnnotation.cx, y: p.y - movingAnnotation.cy };
-                    } else if (movingAnnotation.type === 'text') {
-                        moveOffset = { x: p.x - movingAnnotation.x, y: p.y - movingAnnotation.y };
-                    } else {
-                        moveOffset = { x: p.x - movingAnnotation.x1, y: p.y - movingAnnotation.y1 };
-                    }
+                    if (movingAnnotation.type === 'circle') moveOffset = { x: p.x - movingAnnotation.cx, y: p.y - movingAnnotation.cy };
+                    else if (movingAnnotation.type === 'text') moveOffset = { x: p.x - movingAnnotation.x, y: p.y - movingAnnotation.y };
+                    else moveOffset = { x: p.x - movingAnnotation.x1, y: p.y - movingAnnotation.y1 };
                     return;
                 }
                 drawing = true;
