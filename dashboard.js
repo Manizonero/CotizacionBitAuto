@@ -4,7 +4,6 @@
     const storage = window.AppStorage;
     const $ = (id) => document.getElementById(id);
     const quoteList = $('quoteList');
-    let idToFinalize = null;
     let idToDelete = null;
 
     function renderQuotes() {
@@ -58,11 +57,6 @@
                     $('alertModal').hidden = false;
                     return;
                 }
-                idToFinalize = quote.id;
-                // Usamos el mismo modal de confirmación pero ajustado para finalizar si se prefiere,
-                // pero el usuario pidió ELIMINAR con advertencia.
-                // Mantendré la lógica de "Finalizar" por separado.
-                // Para simplificar, haré que Finalizar borre igual, pero con los checks previos.
                 idToDelete = quote.id;
                 $('deleteModal').hidden = false;
             });
@@ -81,7 +75,7 @@
     $('createNewBtn').addEventListener('click', () => {
         const quotes = storage.getAllQuotes();
         if (quotes.length >= 5) {
-            $('alertMessage').textContent = 'Has alcanzado el límite de 5 cotizaciones simultáneas. Por favor, finaliza o borra alguna para continuar.';
+            $('alertMessage').textContent = 'Has alcanzado el límite de 5 cotizaciones.';
             $('alertModal').hidden = false;
             return;
         }
@@ -125,6 +119,7 @@
     document.addEventListener('DOMContentLoaded', () => {
         renderQuotes();
         updateUserDisplay();
+        storage.highlightActiveNav();
     });
 
 })();

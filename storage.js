@@ -1,8 +1,5 @@
 /**
  * storage.js - Centralización del estado y persistencia (LocalStorage e IndexedDB)
- * -------------------------------------------------------------------------
- * Proporciona una API única para acceder y modificar los datos de la aplicación.
- * Soporta múltiples cotizaciones simultáneas y datos globales de usuario.
  */
 (function(window) {
     'use strict';
@@ -18,60 +15,29 @@
     const AppStorage = {
         makeId: () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8),
 
-        // --- Gestión de Usuario Global ---
         getUserName: () => localStorage.getItem(GLOBAL_USER_KEY) || '',
         setUserName: (name) => localStorage.setItem(GLOBAL_USER_KEY, name),
 
-        // --- Gestión de Sesiones Múltiples ---
         _getMasterState: () => {
             try {
                 const masterStr = localStorage.getItem(STORAGE_KEY);
-                if (!masterStr) return AppStorage._createInitialMaster();
+                if (!masterStr) return { activeQuoteId: null, quotes: {} };
 
                 let parsed = JSON.parse(masterStr);
+                if (!parsed || typeof parsed !== 'object') return { activeQuoteId: null, quotes: {} };
+                if (!parsed.quotes) parsed.quotes = {};
 
-                // MIGRACIÓN: Formato antiguo
-                if (parsed.fields && !parsed.quotes) {
-                    const oldId = 'migrated_' + AppStorage.makeId();
-                    parsed = { activeQuoteId: oldId, quotes: { [oldId]: parsed } };
-                    AppStorage._saveMasterState(parsed);
+                // Migración si viene de versión legacy (formato antiguo)
+                if (parsed.fields && (!parsed.quotes || Object.keys(parsed.quotes).length === 0)) {
+                    const oldId = 'legacy_' + AppStorage.makeId();
+                    const migrated = { activeQuoteId: oldId, quotes: { [oldId]: parsed } };
+                    AppStorage._saveMasterState(migrated);
+                    return migrated;
                 }
-
-                // LIMPIEZA: Eliminar entradas corruptas (sin campos básicos)
-                let changed = false;
-                if (parsed.quotes) {
-                    for (const id in parsed.quotes) {
-                        if (!parsed.quotes[id] || typeof parsed.quotes[id] !== 'object') {
-                            delete parsed.quotes[id];
-                            changed = true;
-                        }
-                    }
-                }
-
-                // SEGURIDAD: Asegurar que siempre haya una sesión válida
-                const keys = Object.keys(parsed.quotes || {});
-                if (keys.length === 0) return AppStorage._createInitialMaster();
-
-                if (!parsed.activeQuoteId || !parsed.quotes[parsed.activeQuoteId]) {
-                    parsed.activeQuoteId = keys[0];
-                    changed = true;
-                }
-
-                if (changed) AppStorage._saveMasterState(parsed);
                 return parsed;
             } catch (error) {
-                return AppStorage._createInitialMaster();
+                return { activeQuoteId: null, quotes: {} };
             }
-        },
-
-        _createInitialMaster: () => {
-            const firstId = AppStorage.makeId();
-            const master = {
-                activeQuoteId: firstId,
-                quotes: { [firstId]: AppStorage.getInitialState() }
-            };
-            AppStorage._saveMasterState(master);
-            return master;
         },
 
         _saveMasterState: (master) => {
@@ -97,39 +63,25 @@
             return newId;
         },
 
-        /**
-         * Borrado Blindado: Elimina la cotización de LocalStorage PRIMERO.
-         */
         deleteQuote: async (id) => {
             const master = AppStorage._getMasterState();
             const idStr = String(id);
-            const quoteData = master.quotes[idStr];
-            if (!quoteData) return;
 
-            const placa = quoteData.fields?.placa;
+            if (master.quotes[idStr]) {
+                const placa = master.quotes[idStr].fields?.placa;
+                delete master.quotes[idStr];
 
-            // 1. Eliminar del objeto maestro
-            delete master.quotes[idStr];
-
-            // 2. Gestionar el ID activo
-            const keys = Object.keys(master.quotes);
-            if (keys.length === 0 || master.activeQuoteId === idStr) {
-                if (keys.length > 0) {
-                    master.activeQuoteId = keys[0];
-                } else {
-                    const newId = AppStorage.makeId();
-                    master.quotes[newId] = AppStorage.getInitialState();
-                    master.activeQuoteId = newId;
+                if (master.activeQuoteId === idStr) {
+                    const keys = Object.keys(master.quotes);
+                    master.activeQuoteId = keys.length > 0 ? keys[0] : null;
                 }
-            }
 
-            // 3. Guardar en LocalStorage
-            AppStorage._saveMasterState(master);
+                AppStorage._saveMasterState(master);
 
-            // 4. Limpiar fotos (no bloquea)
-            if (placa) {
-                const other = Object.values(master.quotes).some(q => q.fields?.placa === placa);
-                if (!other) AppStorage.deletePhotosByPlate(placa).catch(() => {});
+                if (placa) {
+                    const other = Object.values(master.quotes).some(q => q.fields?.placa === placa);
+                    if (!other) AppStorage.deletePhotosByPlate(placa).catch(()=>{});
+                }
             }
         },
 
@@ -147,10 +99,12 @@
             }));
         },
 
-        // --- Gestión de Datos de la Cotización Activa ---
         getState: () => {
             const master = AppStorage._getMasterState();
-            return master.quotes[master.activeQuoteId] || AppStorage.getInitialState();
+            if (!master.activeQuoteId || !master.quotes[master.activeQuoteId]) {
+                return AppStorage.getInitialState();
+            }
+            return master.quotes[master.activeQuoteId];
         },
 
         saveState: (state) => {
@@ -161,10 +115,7 @@
         },
 
         getInitialState: () => ({
-            fields: {
-                fecha: '', placa: '', marca: '', linea: '', modelo: '',
-                color: '', tipoCliente: '', cilindraje: '', vin: ''
-            },
+            fields: { fecha: '', placa: '', marca: '', linea: '', modelo: '', color: '', tipoCliente: '', cilindraje: '', vin: '' },
             quoteItems: [],
             naItems: [],
             verifiedRepuestos: [],
@@ -173,19 +124,7 @@
             photosDownloadedFor: ''
         }),
 
-        clearState: () => {
-            const master = AppStorage._getMasterState();
-            master.quotes[master.activeQuoteId] = AppStorage.getInitialState();
-            AppStorage._saveMasterState(master);
-        },
-
         getPlate: () => AppStorage.getState().fields?.placa?.trim().toUpperCase() || '',
-
-        updateFields: (fields) => {
-            const state = AppStorage.getState();
-            state.fields = { ...state.fields, ...fields };
-            AppStorage.saveState(state);
-        },
 
         updateQuoteItems: (items) => {
             const state = AppStorage.getState();
@@ -215,13 +154,12 @@
         highlightActiveNav: () => {
             const currentPath = window.location.pathname.split('/').pop() || 'index.html';
             document.querySelectorAll('.top-nav .nav-ico').forEach(link => {
-                const path = link.getAttribute('href');
-                if (path === currentPath) link.classList.add('active-nav');
+                const href = link.getAttribute('href');
+                if (href === currentPath) link.classList.add('active-nav');
                 else link.classList.remove('active-nav');
             });
         },
 
-        // --- Configuración Global ---
         getContacts: () => JSON.parse(localStorage.getItem(CONTACTS_KEY) || '[]'),
         saveContacts: (c) => localStorage.setItem(CONTACTS_KEY, JSON.stringify(c)),
         getGroups: () => JSON.parse(localStorage.getItem(GROUPS_KEY) || '[]'),
@@ -229,7 +167,6 @@
         getSettings: () => JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}'),
         saveSettings: (s) => localStorage.setItem(SETTINGS_KEY, JSON.stringify(s)),
 
-        // --- IndexedDB ---
         openDB: () => new Promise((res, rej) => {
             const req = indexedDB.open(DB_NAME, 1);
             req.onupgradeneeded = (e) => {
@@ -245,18 +182,14 @@
         savePhoto: async (p) => {
             const db = await AppStorage.openDB();
             const tx = db.transaction(STORE_NAME, 'readwrite');
-            const s = tx.objectStore(STORE_NAME);
-            s.put({ ...p, createdAt: p.createdAt || Date.now() });
-            return new Promise((res, rej) => { tx.oncomplete = res; tx.onerror = rej; });
+            tx.objectStore(STORE_NAME).put({ ...p, createdAt: p.createdAt || Date.now() });
+            return new Promise(res => { tx.oncomplete = res; });
         },
         getPhotosByPlate: async (placa) => {
             if (!placa) return [];
             const db = await AppStorage.openDB();
-            return new Promise((res, rej) => {
-                const req = db.transaction(STORE_NAME, 'readonly').objectStore(STORE_NAME).index('placaVehiculo').getAll(placa.toUpperCase());
-                req.onsuccess = () => res((req.result || []).filter(r => r.blob?.size > 0).sort((a, b) => a.createdAt - b.createdAt));
-                req.onerror = () => rej(req.error);
-            });
+            const req = db.transaction(STORE_NAME, 'readonly').objectStore(STORE_NAME).index('placaVehiculo').getAll(placa.toUpperCase());
+            return new Promise(res => { req.onsuccess = () => res((req.result || []).filter(r => r.blob?.size > 0).sort((a,b)=>a.createdAt-b.createdAt)); });
         },
         deletePhoto: async (id) => {
             const db = await AppStorage.openDB();
@@ -273,7 +206,7 @@
                 const c = e.target.result;
                 if (c) { c.delete(); c.continue(); }
             };
-            return new Promise(res => { tx.oncomplete = res; tx.onerror = res; });
+            return new Promise(res => { tx.oncomplete = res; });
         }
     };
     window.AppStorage = AppStorage;

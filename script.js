@@ -146,8 +146,10 @@ document.addEventListener('DOMContentLoaded', () => {
             editBtn.innerHTML = '✏️'; editBtn.className = 'action-btn edit-btn';
             editBtn.onclick = () => {
                 descripInput.value = item.descrip; cantInput.value = item.cant;
-                dymInput.value = item.dym || ''; estadoInput.value = item.estado || '';
-                pintInput.value = item.pint || ''; datInput.value = item.dat || '';
+                document.getElementById('dym').value = item.dym || '';
+                document.getElementById('estado').value = item.estado || '';
+                document.getElementById('pint').value = item.pint || '';
+                datInput.value = item.dat || '';
                 editingItem = item; addItemButton.textContent = 'Actualizar'; descripInput.focus();
             };
             const delBtn = document.createElement('button');
@@ -167,9 +169,16 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const loadState = () => {
+        const activeId = storage.getActiveQuoteId();
+        if (!activeId) {
+            window.location.href = 'dashboard.html';
+            return;
+        }
+
         const state = storage.getState();
         const userName = storage.getUserName();
         if (!userName) { userModal.hidden = false; nombreCompletoInput.focus(); return; }
+
         try {
             isLoading = true;
             if (state.fields) {
@@ -227,7 +236,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     addItemButton.addEventListener('click', () => {
         const d = descripInput.value.trim(); if (!d) { showAlert('Descripción obligatoria'); return; }
-        const newItem = { id: editingItem ? editingItem.id : storage.makeId(), descrip: d, cant: cantInput.value.trim(), dym: dymInput.value, estado: estadoInput.value, pint: pintInput.value, dat: datInput.value.trim() };
+        const newItem = { id: editingItem ? editingItem.id : storage.makeId(), descrip: d, cant: cantInput.value.trim(), dym: document.getElementById('dym').value, estado: document.getElementById('estado').value, pint: document.getElementById('pint').value, dat: datInput.value.trim() };
         if (editingItem) quoteItems[quoteItems.findIndex(i => i.id === editingItem.id)] = newItem; else quoteItems.push(newItem);
         editingItem = null; addItemButton.textContent = 'Agregar'; renderTable(); descripInput.value = ''; cantInput.value = ''; datInput.value = ''; descripInput.focus();
     });
