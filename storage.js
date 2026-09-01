@@ -28,25 +28,36 @@
                 const masterStr = localStorage.getItem(STORAGE_KEY);
                 if (!masterStr) return AppStorage._createInitialMaster();
 
-                const parsed = JSON.parse(masterStr);
+                let parsed = JSON.parse(masterStr);
 
+                // MIGRACIÓN: Formato antiguo
                 if (parsed.fields && !parsed.quotes) {
-                    const oldId = 'legacy_' + AppStorage.makeId();
-                    const migrated = { activeQuoteId: oldId, quotes: { [oldId]: parsed } };
-                    AppStorage._saveMasterState(migrated);
-                    return migrated;
+                    const oldId = 'migrated_' + AppStorage.makeId();
+                    parsed = { activeQuoteId: oldId, quotes: { [oldId]: parsed } };
+                    AppStorage._saveMasterState(parsed);
                 }
 
-                if (!parsed.activeQuoteId || !parsed.quotes[parsed.activeQuoteId]) {
-                    const keys = Object.keys(parsed.quotes || {});
-                    if (keys.length > 0) {
-                        parsed.activeQuoteId = keys[0];
-                        AppStorage._saveMasterState(parsed);
-                    } else {
-                        return AppStorage._createInitialMaster();
+                // LIMPIEZA: Eliminar entradas corruptas (sin campos básicos)
+                let changed = false;
+                if (parsed.quotes) {
+                    for (const id in parsed.quotes) {
+                        if (!parsed.quotes[id] || typeof parsed.quotes[id] !== 'object') {
+                            delete parsed.quotes[id];
+                            changed = true;
+                        }
                     }
                 }
 
+                // SEGURIDAD: Asegurar que siempre haya una sesión válida
+                const keys = Object.keys(parsed.quotes || {});
+                if (keys.length === 0) return AppStorage._createInitialMaster();
+
+                if (!parsed.activeQuoteId || !parsed.quotes[parsed.activeQuoteId]) {
+                    parsed.activeQuoteId = keys[0];
+                    changed = true;
+                }
+
+                if (changed) AppStorage._saveMasterState(parsed);
                 return parsed;
             } catch (error) {
                 return AppStorage._createInitialMaster();
@@ -72,7 +83,7 @@
         setActiveQuote: (id) => {
             const master = AppStorage._getMasterState();
             if (master.quotes[id]) {
-                master.activeQuoteId = id;
+                master.activeQuoteId = String(id);
                 AppStorage._saveMasterState(master);
             }
         },
@@ -87,22 +98,22 @@
         },
 
         /**
-         * Borrado Blindado: Elimina la cotización de LocalStorage PRIMERO
-         * para que desaparezca de la vista del usuario inmediatamente.
+         * Borrado Blindado: Elimina la cotización de LocalStorage PRIMERO.
          */
         deleteQuote: async (id) => {
             const master = AppStorage._getMasterState();
-            const quoteData = master.quotes[id];
+            const idStr = String(id);
+            const quoteData = master.quotes[idStr];
             if (!quoteData) return;
 
             const placa = quoteData.fields?.placa;
 
             // 1. Eliminar del objeto maestro
-            delete master.quotes[id];
+            delete master.quotes[idStr];
 
-            // 2. Gestionar el ID activo si acabamos de borrar el actual
-            if (master.activeQuoteId === id) {
-                const keys = Object.keys(master.quotes);
+            // 2. Gestionar el ID activo
+            const keys = Object.keys(master.quotes);
+            if (keys.length === 0 || master.activeQuoteId === idStr) {
                 if (keys.length > 0) {
                     master.activeQuoteId = keys[0];
                 } else {
@@ -112,15 +123,13 @@
                 }
             }
 
-            // 3. Guardar en LocalStorage (esto actualiza la UI al refrescar)
+            // 3. Guardar en LocalStorage
             AppStorage._saveMasterState(master);
 
-            // 4. Limpiar fotos en segundo plano (sin bloquear el hilo principal)
+            // 4. Limpiar fotos (no bloquea)
             if (placa) {
-                const otherWithSamePlate = Object.values(master.quotes).some(q => q.fields?.placa === placa);
-                if (!otherWithSamePlate) {
-                    AppStorage.deletePhotosByPlate(placa).catch(e => console.error("Error borrando fotos:", e));
-                }
+                const other = Object.values(master.quotes).some(q => q.fields?.placa === placa);
+                if (!other) AppStorage.deletePhotosByPlate(placa).catch(() => {});
             }
         },
 
@@ -131,10 +140,10 @@
                 placa: data.fields?.placa || 'SIN PLACA',
                 marca: data.fields?.marca || '-',
                 fecha: data.fields?.fecha || '-',
-                itemsCount: data.quoteItems?.length || 0,
+                itemsCount: (data.quoteItems || []).length,
                 active: id === master.activeQuoteId,
-                photosDownloaded: data.photosDownloaded,
-                emailOpened: data.emailOpened
+                photosDownloaded: !!data.photosDownloaded,
+                emailOpened: !!data.emailOpened
             }));
         },
 
@@ -235,12 +244,10 @@
         }),
         savePhoto: async (p) => {
             const db = await AppStorage.openDB();
-            return new Promise((res, rej) => {
-                const tx = db.transaction(STORE_NAME, 'readwrite');
-                tx.objectStore(STORE_NAME).put({ ...p, createdAt: p.createdAt || Date.now() });
-                tx.oncomplete = () => res();
-                tx.onerror = () => rej(tx.error);
-            });
+            const tx = db.transaction(STORE_NAME, 'readwrite');
+            const s = tx.objectStore(STORE_NAME);
+            s.put({ ...p, createdAt: p.createdAt || Date.now() });
+            return new Promise((res, rej) => { tx.oncomplete = res; tx.onerror = rej; });
         },
         getPhotosByPlate: async (placa) => {
             if (!placa) return [];
@@ -253,11 +260,9 @@
         },
         deletePhoto: async (id) => {
             const db = await AppStorage.openDB();
-            return new Promise((res, rej) => {
-                const req = db.transaction(STORE_NAME, 'readwrite').objectStore(STORE_NAME).delete(id);
-                req.onsuccess = () => res();
-                req.onerror = () => rej(req.error);
-            });
+            const tx = db.transaction(STORE_NAME, 'readwrite');
+            tx.objectStore(STORE_NAME).delete(id);
+            return new Promise(res => { tx.oncomplete = res; });
         },
         deletePhotosByPlate: async (placa) => {
             if (!placa) return;
@@ -268,7 +273,7 @@
                 const c = e.target.result;
                 if (c) { c.delete(); c.continue(); }
             };
-            return new Promise((res) => { tx.oncomplete = () => res(); tx.onerror = () => res(); });
+            return new Promise(res => { tx.oncomplete = res; tx.onerror = res; });
         }
     };
     window.AppStorage = AppStorage;
