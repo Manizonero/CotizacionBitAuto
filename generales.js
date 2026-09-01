@@ -46,6 +46,7 @@
         const plate = getPlate();
         if (plate) {
             const allPhotos = await storage.getPhotosByPlate(plate);
+            // Filtramos solo las fotos generales (sin repuestoId)
             photos = allPhotos.filter(p => !p.repuestoId);
         } else {
             photos = [];
@@ -95,11 +96,12 @@
 
     async function processFiles(event, openDetail) {
         const plate = getPlate();
-        if (!plate) return;
+        if (!plate) { setStatus('No hay placa activa para guardar fotos.'); return; }
 
         try {
             for (const file of event.target.files) {
-                const blob = await compress(file);
+                // Usamos la placa como etiqueta para la foto general
+                const blob = await compress(file, plate);
                 await storage.savePhoto({
                     placaVehiculo: plate,
                     blob: blob,
@@ -110,12 +112,12 @@
             await refresh();
             if (openDetail && photos.length) openEditor(photos[photos.length - 1]);
         } catch (error) {
-            setStatus(`Error: ${error.message}`);
+            setStatus(`Error al guardar: ${error.message}`);
         }
         event.target.value = '';
     }
 
-    function compress(file) {
+    function compress(file, label) {
         return new Promise((resolve, reject) => {
             const image = new Image();
             const url = URL.createObjectURL(file);
@@ -127,34 +129,29 @@
                 const ctx = canvas.getContext('2d');
                 ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
                 URL.revokeObjectURL(url);
+
+                if (label) {
+                    const fontSize = Math.max(12, Math.floor(canvas.width / 55));
+                    ctx.font = `700 ${fontSize}px Oxanium, sans-serif`;
+                    const textWidth = ctx.measureText(label).width;
+                    const pad = Math.max(4, Math.floor(canvas.width * 0.012));
+                    const lineHeight = Math.ceil(fontSize * 1.35);
+                    const boxX = canvas.width - textWidth - pad * 2;
+                    const boxW = textWidth + pad * 2;
+                    const boxH = lineHeight + pad * 2;
+                    const boxY = canvas.height - boxH;
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+                    ctx.fillRect(boxX, boxY, boxW, boxH);
+                    ctx.fillStyle = '#111827';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(label, boxX + pad, boxY + pad + lineHeight / 2);
+                }
+
                 canvas.toBlob(resolve, 'image/jpeg', JPEG_QUALITY);
             };
             image.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Imagen no válida')); };
             image.src = url;
         });
-    }
-
-    // --- Lógica del Editor ---
-
-    function annotationAt(point) {
-        const canvas = $('photoCanvas');
-        const context = canvas.getContext('2d');
-        for (let i = annotations.length - 1; i >= 0; i--) {
-            const ann = annotations[i];
-            let hit = false;
-            if (ann.type === 'circle') hit = Math.abs(distance(point, { x: ann.cx, y: ann.cy }) - ann.radius) < 35;
-            else if (ann.type === 'arrow') hit = distanceToSegment(point, ann) < 35;
-            else if (ann.type === 'text' || ann.type === 'repuesto') {
-                const fontSize = Math.max(12, Math.min(30, canvas.width / 34));
-                context.font = `700 ${fontSize}px Oxanium, sans-serif`;
-                const pad = 10;
-                const w = context.measureText(ann.text).width + pad * 2;
-                const h = fontSize + pad * 2;
-                hit = point.x >= ann.x - w/2 && point.x <= ann.x + w/2 && point.y >= ann.y - h/2 && point.y <= ann.y + h/2;
-            }
-            if (hit) return ann;
-        }
-        return null;
     }
 
     function pointFromEvent(event) {
@@ -198,9 +195,7 @@
             }
             context.stroke();
 
-            if (ann.type === 'text' || ann.type === 'repuesto') {
-                const isRep = ann.type === 'repuesto';
-                const borderColor = isRep ? '#315ddc' : '#ef2222';
+            if (ann.type === 'text') {
                 const fontSize = Math.max(12, Math.min(30, canvas.width / 34));
                 context.font = `700 ${fontSize}px Oxanium, sans-serif`;
                 const pad = 10;
@@ -209,14 +204,10 @@
                 const boxH = fontSize + pad * 2;
                 const x = Math.max(0, Math.min(canvas.width - boxW, ann.x - boxW/2));
                 const y = Math.max(0, Math.min(canvas.height - boxH, ann.y - boxH/2));
-
-                context.fillStyle = '#fff';
-                context.fillRect(x, y, boxW, boxH);
-                context.fillStyle = isRep ? '#0a1e4f' : '#111827';
-                context.textBaseline = 'middle';
+                context.fillStyle = '#fff'; context.fillRect(x, y, boxW, boxH);
+                context.fillStyle = '#111827'; context.textBaseline = 'middle';
                 context.fillText(ann.text, x + pad, y + boxH/2);
-                context.strokeStyle = borderColor;
-                context.lineWidth = isRep ? 4 : 3;
+                context.strokeStyle = '#ef2222'; context.lineWidth = 3;
                 context.strokeRect(x, y, boxW, boxH);
             }
             context.restore();
@@ -235,31 +226,19 @@
         };
         sourceImage.src = URL.createObjectURL(photo.blob);
         $('photoEditor').hidden = false;
-
-        // Poblar selector de repuestos en Generales también por si acaso
-        const repSel = $('repuestoSelect');
-        if (repSel) {
-            repSel.innerHTML = '<option value="">SELECCIONA UN REPUESTO</option>';
-            const state = storage.getState();
-            const reps = [...new Set((Array.isArray(state.quoteItems) ? state.quoteItems : []).map(i => i.descrip?.trim()).filter(Boolean))];
-            reps.forEach(d => {
-                const o = document.createElement('option');
-                o.value = d; o.textContent = d; repSel.appendChild(o);
-            });
-        }
     }
 
-    function addTextAnnotation(val, type = 'text') {
+    function addTextAnnotation(val) {
         if (!val) return;
         const canvas = $('photoCanvas');
-        annotations.push({ type: type, text: val, x: canvas.width / 2, y: canvas.height / 2 });
+        annotations.push({ type: 'text', text: val, x: canvas.width / 2, y: canvas.height / 2 });
         redraw();
     }
 
     function recognizeGesture(path) {
         if (path.length < 2) return;
         const first = path[0]; const last = path[path.length - 1];
-        const xs = path.map(p => p.x); const ys = path.map(p => p.y);
+        const xs = points.map(p => p.x); const ys = points.map(p => p.y);
         const w = Math.max(...xs) - Math.min(...xs); const h = Math.max(...ys) - Math.min(...ys);
         const dist = Math.hypot(first.x - last.x, first.y - last.y);
         if (dist < Math.max(w,h) * 0.4 && w > 20 && h > 20) {
@@ -269,64 +248,129 @@
         }
     }
 
+    function annotationAt(point) {
+        const canvas = $('photoCanvas');
+        const context = canvas.getContext('2d');
+        for (let i = annotations.length - 1; i >= 0; i--) {
+            const ann = annotations[i];
+            let hit = false;
+            if (ann.type === 'circle') hit = Math.abs(distance(point, { x: ann.cx, y: ann.cy }) - ann.radius) < 35;
+            else if (ann.type === 'arrow') hit = distanceToSegment(point, ann) < 35;
+            else if (ann.type === 'text') {
+                const fontSize = Math.max(12, Math.min(30, canvas.width / 34));
+                context.font = `700 ${fontSize}px Oxanium, sans-serif`;
+                const pad = 10;
+                const w = context.measureText(ann.text).width + pad * 2;
+                const h = fontSize + pad * 2;
+                hit = point.x >= ann.x - w/2 && point.x <= ann.x + w/2 && point.y >= ann.y - h/2 && point.y <= ann.y + h/2;
+            }
+            if (hit) return ann;
+        }
+        return null;
+    }
+
     async function init() {
         const plate = getPlate();
         $('plateLabel').textContent = plate ? `PLACA: ${plate}` : 'Sin placa';
+
         await storage.openDB();
         await refresh();
 
-        $('cancelEditBtn').onclick = () => $('photoEditor').hidden = true;
-        $('clearDrawingBtn').onclick = () => { annotations.pop(); redraw(); };
-        $('saveMarkedBtn').onclick = async () => {
+        $('photoInput').addEventListener('change', (e) => processFiles(e, false));
+        $('detailPhotoInput').addEventListener('change', (e) => processFiles(e, true));
+
+        $('cancelEditBtn').addEventListener('click', () => { $('photoEditor').hidden = true; });
+        $('clearDrawingBtn').addEventListener('click', () => { annotations.pop(); redraw(); });
+        $('saveMarkedBtn').addEventListener('click', async () => {
             const blob = await new Promise(res => $('photoCanvas').toBlob(res, 'image/jpeg', JPEG_QUALITY));
             await storage.savePhoto({ ...currentPhoto, blob, marked: true });
             $('photoEditor').hidden = true;
             await refresh();
-        };
+        });
 
-        $('cancelDeleteBtn').onclick = () => $('deleteModal').hidden = true;
-        $('confirmDeleteBtn').onclick = async () => {
+        $('cancelDeleteBtn').addEventListener('click', () => $('deleteModal').hidden = true);
+        $('confirmDeleteBtn').addEventListener('click', async () => {
             if (photoPendingDelete) await storage.deletePhoto(photoPendingDelete.id);
             photoPendingDelete = null;
             $('deleteModal').hidden = true;
             await refresh();
-        };
+        });
 
-        $('damageSelect').onchange = (e) => { if (e.target.value) { addTextAnnotation(e.target.value, 'text'); e.target.value = ''; } };
-        $('repuestoSelect').onchange = (e) => { if (e.target.value) { addTextAnnotation(e.target.value, 'repuesto'); e.target.value = ''; } };
+        $('damageSelect').addEventListener('change', (e) => {
+            if (e.target.value) {
+                addTextAnnotation(e.target.value);
+                e.target.value = '';
+            }
+        });
 
         const canvas = $('photoCanvas');
-        canvas.addEventListener('pointerdown', (e) => {
-            const p = pointFromEvent(e);
-            movingAnnotation = annotationAt(p);
-            if (movingAnnotation) {
-                if (movingAnnotation.type === 'circle') moveOffset = { x: p.x - movingAnnotation.cx, y: p.y - movingAnnotation.cy };
-                else if (movingAnnotation.type === 'text' || movingAnnotation.type === 'repuesto') moveOffset = { x: p.x - movingAnnotation.x, y: p.y - movingAnnotation.y };
-                else moveOffset = { x: p.x - movingAnnotation.x1, y: p.y - movingAnnotation.y1 };
-                return;
-            }
-            drawing = true; points = [p];
-        });
+        if (canvas) {
+            canvas.addEventListener('pointerdown', (e) => {
+                const p = pointFromEvent(e);
+                movingAnnotation = annotationAt(p);
+                if (movingAnnotation) {
+                    if (movingAnnotation.type === 'circle') {
+                        moveOffset = { x: p.x - movingAnnotation.cx, y: p.y - movingAnnotation.cy };
+                    } else if (movingAnnotation.type === 'text') {
+                        moveOffset = { x: p.x - movingAnnotation.x, y: p.y - movingAnnotation.y };
+                    } else {
+                        moveOffset = { x: p.x - movingAnnotation.x1, y: p.y - movingAnnotation.y1 };
+                    }
+                    return;
+                }
+                drawing = true;
+                points = [p];
+            });
 
-        canvas.addEventListener('pointermove', (e) => {
-            const p = pointFromEvent(e);
-            if (movingAnnotation) {
-                if (movingAnnotation.type === 'circle') { movingAnnotation.cx = p.x - moveOffset.x; movingAnnotation.cy = p.y - moveOffset.y; }
-                else if (movingAnnotation.type === 'text' || movingAnnotation.type === 'repuesto') { movingAnnotation.x = p.x - moveOffset.x; movingAnnotation.y = p.y - moveOffset.y; }
-                else { const dx = p.x - moveOffset.x - movingAnnotation.x1; const dy = p.y - moveOffset.y - movingAnnotation.y1; movingAnnotation.x1 += dx; movingAnnotation.x2 += dx; movingAnnotation.y1 += dy; movingAnnotation.y2 += dy; }
-                redraw(); return;
-            }
-            if (!drawing) return;
-            points.push(p);
-            redraw();
-            const ctx = canvas.getContext('2d');
-            ctx.save(); ctx.strokeStyle = '#ef2222'; ctx.lineWidth = annotationStrokeWidth(); ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(points[0].x, points[0].y);
-            for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
-            ctx.stroke(); ctx.restore();
-        });
+            canvas.addEventListener('pointermove', (e) => {
+                const p = pointFromEvent(e);
+                if (movingAnnotation) {
+                    if (movingAnnotation.type === 'circle') {
+                        movingAnnotation.cx = p.x - moveOffset.x;
+                        movingAnnotation.cy = p.y - moveOffset.y;
+                    } else if (movingAnnotation.type === 'text') {
+                        movingAnnotation.x = p.x - moveOffset.x;
+                        movingAnnotation.y = p.y - moveOffset.y;
+                    } else {
+                        const dx = p.x - moveOffset.x - movingAnnotation.x1;
+                        const dy = p.y - moveOffset.y - movingAnnotation.y1;
+                        movingAnnotation.x1 += dx; movingAnnotation.x2 += dx;
+                        movingAnnotation.y1 += dy; movingAnnotation.y2 += dy;
+                    }
+                    redraw();
+                    return;
+                }
+                if (!drawing) return;
+                points.push(p);
 
-        canvas.addEventListener('pointerup', () => { movingAnnotation = null; if (!drawing) return; drawing = false; recognizeGesture(points); redraw(); });
+                redraw();
+                const ctx = canvas.getContext('2d');
+                ctx.save();
+                ctx.strokeStyle = '#ef2222';
+                ctx.lineWidth = annotationStrokeWidth();
+                ctx.lineCap = 'round';
+                ctx.beginPath();
+                ctx.moveTo(points[0].x, points[0].y);
+                for (let i = 1; i < points.length; i++) {
+                    ctx.lineTo(points[i].x, points[i].y);
+                }
+                ctx.stroke();
+                ctx.restore();
+            });
+
+            canvas.addEventListener('pointerup', () => {
+                if (movingAnnotation) {
+                    movingAnnotation = null;
+                    return;
+                }
+                if (!drawing) return;
+                drawing = false;
+                recognizeGesture(points);
+                redraw();
+            });
+        }
         storage.highlightActiveNav();
     }
+
     document.addEventListener('DOMContentLoaded', init);
 })();
