@@ -21,10 +21,12 @@
 
     const escapeHtml = (v) => String(v || '-').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
+    // Genera el contenido HTML para copiar (Saludo + Tablas)
     const richBody = () => {
         const state = storage.getState();
         const fields = state.fields || {};
         const items = state.quoteItems || [];
+        const greeting = storage.getSettings().greeting || 'Cordial saludo,';
         const statusOrder = { CAMBIO: 0, RECUPERACION: 1, FUERTE: 2, MEDIO: 3, LEVE: 4 };
 
         const ordered = [...items].sort((a, b) => {
@@ -36,22 +38,34 @@
         const rows = ordered.length ? ordered.map((item, index) => {
             const isChange = String(item.estado || '').trim().toUpperCase() === 'CAMBIO';
             const color = isChange ? '#ff0000' : '#000000';
-            return `<tr style="color:${color};"><td>${index + 1}</td><td>${escapeHtml(item.descrip)}</td><td>${escapeHtml(item.cant)}</td><td>${escapeHtml(item.dym)}</td><td>${escapeHtml(item.estado)}</td><td>${escapeHtml(item.pint)}</td><td>${escapeHtml(item.dat)}</td></tr>`;
-        }).join('') : '<tr><td colspan="7">No hay repuestos registrados.</td></tr>';
+            return `<tr style="color:${color};">
+                <td style="border:1px solid #000;padding:6px;text-align:center;">${index + 1}</td>
+                <td style="border:1px solid #000;padding:6px;">${escapeHtml(item.descrip)}</td>
+                <td style="border:1px solid #000;padding:6px;text-align:center;">${escapeHtml(item.cant)}</td>
+                <td style="border:1px solid #000;padding:6px;text-align:center;">${escapeHtml(item.dym)}</td>
+                <td style="border:1px solid #000;padding:6px;">${escapeHtml(item.estado)}</td>
+                <td style="border:1px solid #000;padding:6px;text-align:center;">${escapeHtml(item.pint)}</td>
+                <td style="border:1px solid #000;padding:6px;">${escapeHtml(item.dat)}</td>
+            </tr>`;
+        }).join('') : '<tr><td colspan="7" style="border:1px solid #000;padding:6px;">No hay repuestos registrados.</td></tr>';
 
-        const cellStyle = 'border:1px solid #000;padding:6px;';
+        const cellStyle = 'border:1px solid #000;padding:8px;font-weight:bold;background-color:#c6dcf0;text-align:left;';
 
-        return `<div style="font-family:Arial,sans-serif;">${escapeHtml(storage.getSettings().greeting || 'Cordial saludo,').replace(/\n/g, '<br>')}</div><br>
-                <strong>Datos del vehiculo</strong><br>
-                <table border="1" cellspacing="0" style="border-collapse:collapse;width:100%;">
-                    <tr style="background:#c6dcf0;"><th style="${cellStyle}">Fecha</th><th style="${cellStyle}">Placa</th><th style="${cellStyle}">Marca</th><th style="${cellStyle}">Linea</th></tr>
-                    <tr><td style="${cellStyle}">${escapeHtml(fields.fecha)}</td><td style="${cellStyle}">${escapeHtml(fields.placa)}</td><td style="${cellStyle}">${escapeHtml(fields.marca)}</td><td style="${cellStyle}">${escapeHtml(fields.linea)}</td></tr>
-                </table><br>
-                <strong>Repuestos solicitados</strong><br>
-                <table border="1" cellspacing="0" style="border-collapse:collapse;width:100%;">
-                    <thead><tr style="background:#c6dcf0;"><th style="${cellStyle}">N°</th><th style="${cellStyle}">DESCRIPCIÓN</th><th style="${cellStyle}">CANT</th><th style="${cellStyle}">DYM</th><th style="${cellStyle}">DAÑO</th><th style="${cellStyle}">PINT</th><th style="${cellStyle}">OBS</th></tr></thead>
+        return `<div style="font-family:Arial,sans-serif;color:#000;">
+                <p>${escapeHtml(greeting).replace(/\n/g, '<br>')}</p>
+                <br>
+                <strong>DATOS DEL VEHICULO</strong><br>
+                <table border="1" cellspacing="0" cellpadding="5" style="border-collapse:collapse;width:100%;font-family:Arial,sans-serif;font-size:14px;margin-top:5px;">
+                    <tr><th style="${cellStyle}">Fecha</th><th style="${cellStyle}">Placa</th><th style="${cellStyle}">Marca</th><th style="${cellStyle}">Linea</th></tr>
+                    <tr><td style="border:1px solid #000;padding:6px;">${escapeHtml(fields.fecha)}</td><td style="border:1px solid #000;padding:6px;">${escapeHtml(fields.placa)}</td><td style="border:1px solid #000;padding:6px;">${escapeHtml(fields.marca)}</td><td style="border:1px solid #000;padding:6px;">${escapeHtml(fields.linea)}</td></tr>
+                </table>
+                <br>
+                <strong>REPUESTOS SOLICITADOS</strong><br>
+                <table border="1" cellspacing="0" cellpadding="5" style="border-collapse:collapse;width:100%;font-family:Arial,sans-serif;font-size:14px;margin-top:5px;">
+                    <thead><tr style="background-color:#c6dcf0;"><th style="border:1px solid #000;padding:6px;">N°</th><th style="border:1px solid #000;padding:6px;">DESCRIPCIÓN</th><th style="border:1px solid #000;padding:6px;">CANT</th><th style="border:1px solid #000;padding:6px;">DYM</th><th style="border:1px solid #000;padding:6px;">DAÑO</th><th style="border:1px solid #000;padding:6px;">PINT</th><th style="border:1px solid #000;padding:6px;">OBS</th></tr></thead>
                     <tbody>${rows}</tbody>
-                </table>`;
+                </table>
+                </div>`;
     };
 
     const updatePreview = () => {
@@ -115,9 +129,12 @@
     const renderGroupContactsSelector = (selectedEmails = []) => {
         const list = $('groupContactsList');
         if (!list) return;
-        list.innerHTML = contacts.length ? '' : '<p class="muted">No hay contactos.</p>';
+        list.innerHTML = contacts.length ? '' : '<p class="muted">No hay contactos registrados.</p>';
         contacts.forEach(c => {
             const label = document.createElement('label');
+            label.style.display = 'flex';
+            label.style.alignItems = 'center';
+            label.style.gap = '8px';
             label.innerHTML = `<input type="checkbox" value="${c.email}" ${selectedEmails.includes(c.email) ? 'checked' : ''}> ${c.name}`;
             list.appendChild(label);
         });
@@ -134,6 +151,39 @@
             sel.appendChild(opt);
         });
         sel.value = old;
+    };
+
+    const copyToClipboard = async (html) => {
+        try {
+            // Método moderno para navegadores que lo soportan
+            if (navigator.clipboard && window.ClipboardItem) {
+                const blob = new Blob([html], { type: 'text/html' });
+                const item = new ClipboardItem({ 'text/html': blob });
+                await navigator.clipboard.write([item]);
+                return true;
+            }
+        } catch (err) {
+            console.error('Fallo clipboard API:', err);
+        }
+
+        // Método de respaldo (fallback) con div temporal - muy confiable
+        const container = document.createElement('div');
+        container.innerHTML = html;
+        container.style.position = 'fixed';
+        container.style.left = '-9999px';
+        container.style.top = '0';
+        container.contentEditable = true;
+        document.body.appendChild(container);
+
+        const range = document.createRange();
+        range.selectNodeContents(container);
+        const selection = window.getSelection();
+        selection.removeAllRanges();
+        selection.addRange(range);
+
+        const success = document.execCommand('copy');
+        document.body.removeChild(container);
+        return success;
     };
 
     document.addEventListener('DOMContentLoaded', () => {
@@ -169,8 +219,9 @@
 
         $('contactsList').onclick = (e) => {
             const i = e.target.dataset.idx; if (i === undefined) return;
-            if (e.target.classList.contains('delete-contact')) { contacts.splice(i, 1); storage.saveContacts(contacts); renderContacts(); }
-            if (e.target.classList.contains('edit-contact')) { editingContactIndex = i; $('contactName').value = contacts[i].name; $('contactEmail').value = contacts[i].email; $('contactForm').hidden = false; }
+            const index = parseInt(i);
+            if (e.target.classList.contains('delete-contact')) { contacts.splice(index, 1); storage.saveContacts(contacts); renderContacts(); }
+            if (e.target.classList.contains('edit-contact')) { editingContactIndex = index; $('contactName').value = contacts[index].name; $('contactEmail').value = contacts[index].email; $('contactForm').hidden = false; }
         };
 
         $('addGroupBtn').onclick = () => { editingGroupIndex = null; $('groupForm').reset(); $('groupForm').hidden = false; renderGroupContactsSelector(); };
@@ -178,7 +229,7 @@
         $('groupForm').onsubmit = (e) => {
             e.preventDefault();
             const selected = Array.from($('groupContactsList').querySelectorAll('input:checked')).map(cb => cb.value);
-            if (!selected.length) return;
+            if (!selected.length) { alert('Elige al menos un contacto.'); return; }
             const g = { name: $('groupName').value.trim(), emails: selected };
             if (editingGroupIndex === null) groups.push(g); else groups[editingGroupIndex] = g;
             storage.saveGroups(groups); renderGroups(); $('groupForm').hidden = true;
@@ -186,13 +237,14 @@
 
         $('groupsList').onclick = (e) => {
             const i = e.target.dataset.idx; if (i === undefined) return;
-            if (e.target.classList.contains('delete-group')) { groups.splice(i, 1); storage.saveGroups(groups); renderGroups(); }
-            if (e.target.classList.contains('edit-group')) { editingGroupIndex = i; $('groupName').value = groups[i].name; $('groupForm').hidden = false; renderGroupContactsSelector(groups[i].emails); }
+            const index = parseInt(i);
+            if (e.target.classList.contains('delete-group')) { groups.splice(index, 1); storage.saveGroups(groups); renderGroups(); }
+            if (e.target.classList.contains('edit-group')) { editingGroupIndex = index; $('groupName').value = groups[index].name; $('groupForm').hidden = false; renderGroupContactsSelector(groups[index].emails); }
         };
 
         $('openGmailBtn').onclick = async () => {
             const idx = $('groupSelector').value;
-            if (idx === "") { $('alertMessage').textContent = 'Elige un grupo.'; $('alertModal').hidden = false; return; }
+            if (idx === "") { $('alertMessage').textContent = 'Elige un grupo primero.'; $('alertModal').hidden = false; return; }
 
             const state = storage.getState();
             if (!state.photosDownloaded) { $('alertMessage').textContent = 'Descarga las fotos primero.'; $('alertModal').hidden = false; return; }
@@ -201,14 +253,20 @@
             const recipients = group.emails.join(',');
             const subject = getSubjectText();
 
-            try {
-                const html = richBody();
-                const blob = new Blob([html], { type: 'text/html' });
-                await navigator.clipboard.write([new ClipboardItem({ 'text/html': blob })]);
-            } catch (err) { console.error(err); }
+            const html = richBody();
+            const copied = await copyToClipboard(html);
 
             storage.setEmailOpened(true);
             const webUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(recipients)}&su=${encodeURIComponent(subject)}`;
+
+            if (copied) {
+                $('mailStatus').textContent = '¡Saludo y Tabla copiados! Pégalos en Gmail.';
+                $('mailStatus').style.color = '#17643a';
+            } else {
+                $('mailStatus').textContent = 'Error al copiar. Intenta copiar manualmente.';
+                $('mailStatus').style.color = '#b52d40';
+            }
+
             const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
             if (isMobile) {
                 const q = `to=${encodeURIComponent(recipients)}&subject=${encodeURIComponent(subject)}`;
