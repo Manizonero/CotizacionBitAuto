@@ -21,7 +21,6 @@
 
     const escapeHtml = (v) => String(v || '-').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-    // Genera versión en TEXTO PLANO para el portapapeles (Respaldo)
     const getPlainTextBody = () => {
         const state = storage.getState();
         const f = state.fields || {};
@@ -38,7 +37,6 @@
         return text;
     };
 
-    // Genera versión en HTML para el portapapeles (Tabla con formato)
     const richBody = () => {
         const state = storage.getState();
         const fields = state.fields || {};
@@ -85,17 +83,83 @@
                 </div>`;
     };
 
+    const renderContacts = () => {
+        const list = $('contactsList');
+        if (!list) return;
+        list.innerHTML = '';
+        contacts.forEach((contact, index) => {
+            const row = document.createElement('div');
+            row.className = 'contact-row';
+            row.innerHTML = `
+                <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;"><strong>${contact.name}</strong><br><small>${contact.email}</small></span>
+                <button type="button" class="contact-action edit-contact" data-idx="${index}">Editar</button>
+                <button type="button" class="contact-action delete-contact" data-idx="${index}" style="background:#fff0f2;color:#b52d40;">Borrar</button>
+            `;
+            list.appendChild(row);
+        });
+    };
+
+    const renderGroups = () => {
+        const list = $('groupsList');
+        if (!list) return;
+        list.innerHTML = '';
+        groups.forEach((group, index) => {
+            const row = document.createElement('div');
+            row.className = 'contact-row';
+            row.innerHTML = `
+                <span style="flex:1;"><strong>${group.name}</strong><br><small>${group.emails.length} correos</small></span>
+                <button type="button" class="contact-action edit-group" data-idx="${index}">Editar</button>
+                <button type="button" class="contact-action delete-group" data-idx="${index}" style="background:#fff0f2;color:#b52d40;">Borrar</button>
+            `;
+            list.appendChild(row);
+        });
+    };
+
+    const renderGroupContactsSelector = (selectedEmails = []) => {
+        const list = $('groupContactsList');
+        if (!list) return;
+        list.innerHTML = contacts.length ? '' : '<p class="muted">No hay contactos registrados.</p>';
+        contacts.forEach(c => {
+            const label = document.createElement('label');
+            label.style.display = 'flex';
+            label.style.alignItems = 'center';
+            label.style.gap = '8px';
+            label.innerHTML = `<input type="checkbox" value="${c.email}" ${selectedEmails.includes(c.email) ? 'checked' : ''}> ${c.name}`;
+            list.appendChild(label);
+        });
+    };
+
+    const updateGroupSelector = () => {
+        const sel = $('groupSelector');
+        if (!sel) return;
+        const old = sel.value;
+        sel.innerHTML = '<option value="">Selecciona un grupo...</option>';
+        groups.forEach((g, i) => {
+            const opt = document.createElement('option');
+            opt.value = i; opt.textContent = g.name;
+            sel.appendChild(opt);
+        });
+        sel.value = old;
+    };
+
     const updatePreview = () => {
         const state = storage.getState();
         const f = state.fields || {};
+
         const subInput = $('subjectInput');
         if (subInput) subInput.value = getSubjectText();
+
         const label = $('mailVehicleLabel');
         if (label) label.textContent = `${f.marca || '-'} ${f.linea || '-'} / ${f.placa || '-'}`;
+
+        const prevGreeting = $('mailPreviewGreeting');
+        if (prevGreeting) prevGreeting.textContent = $('greetingInput').value.trim() || 'Cordial saludo,';
+
         const body = $('mailItemsTableBody');
         if (body) {
             body.innerHTML = '';
-            (state.quoteItems || []).forEach((item, index) => {
+            const items = state.quoteItems || [];
+            items.forEach((item, index) => {
                 const row = document.createElement('tr');
                 [String(index + 1), item.descrip, item.cant, item.estado, item.pint, item.dat].forEach(text => {
                     const td = document.createElement('td');
@@ -109,7 +173,6 @@
 
     const copyToClipboard = async (html, plain) => {
         try {
-            // Intento 1: API Moderna (Requiere HTTPS y contexto seguro)
             if (navigator.clipboard && window.ClipboardItem) {
                 const data = [new ClipboardItem({
                     'text/html': new Blob([html], { type: 'text/html' }),
@@ -118,9 +181,8 @@
                 await navigator.clipboard.write(data);
                 return true;
             }
-        } catch (e) { console.error('Clipboard API failed', e); }
+        } catch (e) {}
 
-        // Intento 2: Fallback Clásico (Para móviles y navegadores antiguos)
         const container = document.createElement('div');
         container.innerHTML = html;
         container.style.position = 'fixed';
@@ -145,7 +207,7 @@
             $('greetingInput').oninput = () => { set.greeting = $('greetingInput').value; storage.saveSettings(set); };
         }
 
-        $('openRecipientsBtn').onclick = () => { $('recipientsModal').hidden = false; renderContacts(); renderGroups(); };
+        $('openRecipientsBtn').onclick = () => { refreshData(); $('recipientsModal').hidden = false; renderContacts(); renderGroups(); };
         $('closeRecipientsBtn').onclick = () => { $('recipientsModal').hidden = true; updateGroupSelector(); };
         $('saveRecipientsBtn').onclick = () => { $('recipientsModal').hidden = true; updateGroupSelector(); };
 
@@ -180,7 +242,7 @@
         $('groupForm').onsubmit = (e) => {
             e.preventDefault();
             const selected = Array.from($('groupContactsList').querySelectorAll('input:checked')).map(cb => cb.value);
-            if (!selected.length) return;
+            if (!selected.length) { alert('Elige al menos un contacto.'); return; }
             const g = { name: $('groupName').value.trim(), emails: selected };
             if (editingGroupIndex === null) groups.push(g); else groups[editingGroupIndex] = g;
             storage.saveGroups(groups); renderGroups(); $('groupForm').hidden = true;
@@ -196,7 +258,6 @@
         $('openGmailBtn').onclick = async () => {
             const idx = $('groupSelector').value;
             if (idx === "") { $('alertMessage').textContent = 'Elige un grupo primero.'; $('alertModal').hidden = false; return; }
-
             const state = storage.getState();
             if (!state.photosDownloaded) { $('alertMessage').textContent = 'Descarga las fotos primero.'; $('alertModal').hidden = false; return; }
 
@@ -206,15 +267,10 @@
             const html = richBody();
             const plain = getPlainTextBody();
 
-            // Copiar al portapapeles con feedback
             const copied = await copyToClipboard(html, plain);
-
             if (copied) {
                 $('mailStatus').textContent = '¡Datos copiados! Pégalos en Gmail.';
                 $('mailStatus').style.color = '#17643a';
-            } else {
-                $('mailStatus').textContent = 'Error al copiar automáticamente.';
-                $('mailStatus').style.color = '#b52d40';
             }
 
             storage.setEmailOpened(true);
